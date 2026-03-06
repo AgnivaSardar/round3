@@ -18,7 +18,7 @@ export function TopNav() {
       <div className="flex items-center gap-2 mr-8">
         <Activity className="h-6 w-6 text-primary" />
         <span className="font-display text-lg tracking-wider text-primary">
-          FLEET<span className="text-accent">IQ</span>
+          VEHIXA
         </span>
       </div>
 

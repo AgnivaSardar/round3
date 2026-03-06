@@ -3,10 +3,20 @@ import { CursorSpotlight } from "@/components/motion/CursorSpotlight";
 import { Magnetic } from "@/components/motion/Magnetic";
 import { ScrollProgress } from "@/components/motion/ScrollProgress";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { ArrowRight, Car, Gauge, Layers, Play, Shield, Sparkles, Zap } from "lucide-react";
+import { ArrowRight, Car, Gauge, Layers, Shield, Sparkles, Zap } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Suspense, lazy, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+
+// dialog UI components used for login/get started prompts
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 const CarHeroScene = lazy(() =>
   import("@/components/three/CarHeroScene").then((m) => ({ default: m.CarHeroScene })),
@@ -141,6 +151,10 @@ function HeroVisual(props: { className?: string }) {
 
 export default function LandingPage() {
   const reduce = useReducedMotion();
+  const navigate = useNavigate();
+  // dialog open state for login/signup
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [signupOpen, setSignupOpen] = useState(false);
 
   const container = useMemo(
     () => ({
@@ -148,6 +162,22 @@ export default function LandingPage() {
       show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.2, 0.8, 0.2, 1] as const } },
     }),
     [reduce],
+  );
+
+  // variants for how-it-works steps
+  const stepsContainer = useMemo(
+    () => ({
+      hidden: { opacity: 0 },
+      show: { opacity: 1, transition: { staggerChildren: 0.12 } },
+    }),
+    [],
+  );
+  const stepItem = useMemo(
+    () => ({
+      hidden: { opacity: 0, x: 20 },
+      show: { opacity: 1, x: 0, transition: { duration: 0.4, ease: [0.2, 0.8, 0.2, 1] as const } },
+    }),
+    [],
   );
 
   return (
@@ -165,9 +195,11 @@ export default function LandingPage() {
             </span>
             <div className="leading-tight">
               <div className="font-display text-sm tracking-wider text-foreground">
-                TELEMETRY <span className="text-gradient">WHISPER</span>
+                <span className="text-gradient">VEHIXA</span>
               </div>
-              <div className="text-xs font-semibold uppercase tracking-[0.26em] text-muted-foreground">3D landing · neon theme</div>
+              <div className="text-xs font-semibold uppercase tracking-[0.26em] text-muted-foreground">
+                Intelligent Vehicle Fault Detection System
+              </div>
             </div>
           </Link>
 
@@ -175,24 +207,17 @@ export default function LandingPage() {
             <a className="text-sm font-semibold text-muted-foreground hover:text-foreground" href="#features">
               Features
             </a>
-            <a className="text-sm font-semibold text-muted-foreground hover:text-foreground" href="#preview">
-              Preview
+            <a className="text-sm font-semibold text-muted-foreground hover:text-foreground" href="#how-it-works">
+              How it works
             </a>
             <a className="text-sm font-semibold text-muted-foreground hover:text-foreground" href="#cta">
-              Start
+              Get started
             </a>
           </div>
 
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <Magnetic>
-              <Link
-                to="/dashboard"
-                className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-card/40 px-4 py-2 text-sm font-semibold text-foreground backdrop-blur transition hover:-translate-y-0.5 hover:bg-card/60"
-              >
-                Open console <ArrowRight className="h-4 w-4 opacity-80" />
-              </Link>
-            </Magnetic>
+            {/* future auth buttons could go here */}
           </div>
         </div>
       </header>
@@ -203,56 +228,59 @@ export default function LandingPage() {
             <div className="flex flex-wrap gap-2">
               <Pill>
                 <Sparkles className="h-3.5 w-3.5 text-primary" />
-                Crazy motion, but readable UI
+                Real-Time Monitoring
               </Pill>
               <Pill className="shadow-[0_0_0_1px_hsl(var(--accent)/0.10),0_0_30px_-18px_hsl(var(--accent)/0.30)]">
                 <Zap className="h-3.5 w-3.5 text-accent" />
-                Neon theme refresh
+                Fault Detection
+              </Pill>
+              <Pill className="shadow-[0_0_0_1px_hsl(var(--accent)/0.10),0_0_30px_-18px_hsl(var(--accent)/0.30)]">
+                <Shield className="h-3.5 w-3.5 text-primary" />
+                Priority Alerts
               </Pill>
             </div>
 
             <div className="mt-8 text-balance text-5xl font-semibold leading-[0.95] tracking-tight md:text-6xl">
-              A 3D landing page
+              Vehixa – AI Powered
               <br />
-              built for <span className="text-gradient">telemetry</span>.
+              Vehicle Fault Detection
             </div>
 
             <div className="mt-5 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground md:text-lg">
-              Animated, glassy, and fast. The hero runs a real WebGL scene (procedural car + neon grid) with a video fallback.
-              Everything uses your Tailwind + CSS-variable theme.
+              Monitor vehicle health instantly with AI-powered fault detection and smart alerts.
             </div>
 
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Magnetic>
-                <a
-                  href="#preview"
+                <button
+                  onClick={() => setLoginOpen(true)}
                   className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(90deg,hsl(var(--primary)),hsl(var(--accent)))] px-5 py-2.5 text-sm font-semibold text-background transition hover:-translate-y-0.5"
                 >
-                  Watch the preview <Play className="h-4 w-4" />
-                </a>
+                  Log in
+                </button>
               </Magnetic>
               <Magnetic>
-                <Link
-                  to="/dashboard"
+                <button
+                  onClick={() => setSignupOpen(true)}
                   className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-card/40 px-5 py-2.5 text-sm font-semibold text-foreground backdrop-blur transition hover:-translate-y-0.5 hover:bg-card/60"
                 >
-                  Enter the console <ArrowRight className="h-4 w-4 opacity-80" />
-                </Link>
+                  Get Started
+                </button>
               </Magnetic>
             </div>
 
             <div className="mt-8 grid gap-2 md:grid-cols-3">
               <div className="rounded-2xl border border-border/60 bg-card/35 p-4 backdrop-blur glow">
-                <div className="text-xs font-semibold uppercase tracking-[0.26em] text-muted-foreground">Render</div>
-                <div className="mt-2 text-lg font-semibold">WebGL + video</div>
+                <div className="text-xs font-semibold uppercase tracking-[0.26em] text-muted-foreground">Scope</div>
+                <div className="mt-2 text-lg font-semibold">Engine · Battery · Brakes</div>
               </div>
               <div className="rounded-2xl border border-border/60 bg-card/35 p-4 backdrop-blur">
-                <div className="text-xs font-semibold uppercase tracking-[0.26em] text-muted-foreground">Motion</div>
-                <div className="mt-2 text-lg font-semibold">Bloom + scan</div>
+                <div className="text-xs font-semibold uppercase tracking-[0.26em] text-muted-foreground">Focus</div>
+                <div className="mt-2 text-lg font-semibold">Faults, not just metrics</div>
               </div>
               <div className="rounded-2xl border border-border/60 bg-card/35 p-4 backdrop-blur">
-                <div className="text-xs font-semibold uppercase tracking-[0.26em] text-muted-foreground">Theme</div>
-                <div className="mt-2 text-lg font-semibold">Cyan / Magenta</div>
+                <div className="text-xs font-semibold uppercase tracking-[0.26em] text-muted-foreground">Interface</div>
+                <div className="mt-2 text-lg font-semibold">3D health visualization</div>
               </div>
             </div>
           </motion.div>
@@ -262,78 +290,255 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* login/signup dialogs */}
+        <Dialog open={loginOpen} onOpenChange={setLoginOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Log in</DialogTitle>
+              <DialogDescription>Enter your credentials to continue.</DialogDescription>
+            </DialogHeader>
+            <form
+              className="grid gap-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                // TODO: authenticate credentials
+                setLoginOpen(false);
+                navigate("/dashboard");
+              }}
+            >
+              <input type="email" placeholder="Email" required className="w-full rounded border px-3 py-2" />
+              <input type="password" placeholder="Password" required className="w-full rounded border px-3 py-2" />
+              <DialogFooter>
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center rounded-full bg-[linear-gradient(90deg,hsl(var(--primary)),hsl(var(--accent)))] px-4 py-2 text-sm font-semibold text-background"
+                >
+                  Log in
+                </button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+        <Dialog open={signupOpen} onOpenChange={setSignupOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create an account</DialogTitle>
+              <DialogDescription>Get started by setting up your profile.</DialogDescription>
+            </DialogHeader>
+            <form
+              className="grid gap-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                // TODO: register user
+                setSignupOpen(false);
+                navigate("/dashboard");
+              }}
+            >
+              <input type="email" placeholder="Email" required className="w-full rounded border px-3 py-2" />
+              <input type="password" placeholder="Password" required className="w-full rounded border px-3 py-2" />
+              <DialogFooter>
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center rounded-full bg-[linear-gradient(90deg,hsl(var(--primary)),hsl(var(--accent)))] px-4 py-2 text-sm font-semibold text-background"
+                >
+                  Sign up
+                </button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
         <section id="features" className="mx-auto max-w-6xl px-4 pb-16 md:px-6 md:pb-24">
           <div className="flex items-end justify-between gap-6">
             <div>
               <div className="text-xs font-semibold uppercase tracking-[0.30em] text-muted-foreground">Features</div>
-              <div className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">Neon, glass, and depth.</div>
-              <div className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground md:text-base">
-                The hero is a real 3D scene (procedural car) with post-processing, plus a video layer you can swap for a real
-                road clip.
-              </div>
+              <div className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">Smart Vehicle Monitoring</div>
             </div>
             <div className="hidden text-sm font-semibold text-muted-foreground md:block">
-              <span className="inline-block animate-glitch">GLITCH READY</span>
+              <span className="inline-block">Designed for hackathon fleets</span>
             </div>
           </div>
 
           <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <Feature
               icon={<Car className="h-5 w-5 text-primary" />}
-              title="3D hero car"
-              description="Procedural geometry (no model file needed) with animated wheels, camera parallax, and neon accents."
+              title="Real-Time Telemetry Visualization"
+              description="Monitor important vehicle parameters including engine temperature, battery voltage, speed, fuel efficiency, and vibration through an interactive dashboard."
             />
             <Feature
               icon={<Layers className="h-5 w-5 text-accent" />}
-              title="Crazy layers"
-              description="Scanlines, noise, radial glows, and gradient masks that keep the scene cinematic without killing readability."
+              title="Intelligent Fault Detection"
+              description="Vehixa continuously analyzes telemetry data streams and detects abnormal patterns using rule-based anomaly detection logic."
             />
             <Feature
               icon={<Gauge className="h-5 w-5 text-primary" />}
-              title="Performance-aware"
-              description="Reduced-motion users skip the WebGL animation. Everyone else gets a crisp, bloom-heavy scene."
+              title="Priority-Based Alerts"
+              description="When faults are detected, alerts are automatically categorized into severity levels so critical issues can be addressed immediately."
             />
           </div>
         </section>
 
-        <section id="preview" className="mx-auto max-w-6xl px-4 pb-16 md:px-6 md:pb-24">
+        <section id="how-it-works" className="mx-auto max-w-6xl px-4 pb-16 md:px-6 md:pb-24">
           <div className="rounded-[32px] border border-border/60 bg-card/30 p-8 backdrop-blur md:p-12">
             <div className="grid gap-10 md:grid-cols-12 md:items-center">
-              <div className="md:col-span-7">
-                <div className="text-xs font-semibold uppercase tracking-[0.30em] text-muted-foreground">Preview</div>
+              <motion.div
+                className="md:col-span-7"
+                initial="hidden"
+                whileInView="show"
+                viewport={{ once: true, amount: 0.3 }}
+                variants={container}
+              >
+                <div className="text-xs font-semibold uppercase tracking-[0.30em] text-muted-foreground">How it works</div>
                 <div className="mt-4 text-4xl font-semibold leading-[1.0] tracking-tight md:text-5xl">
-                  Plug in a real car model
-                  <br />
-                  or ship with video.
+                  How Vehixa Detects Vehicle Faults
                 </div>
                 <div className="mt-4 max-w-xl text-sm leading-relaxed text-muted-foreground md:text-base">
-                  If you want an actual 3D car asset, drop a `.glb` in `public/` and we can load it with `drei` in minutes.
-                  If you prefer video, put a clip at `public/landing/road.mp4`.
+                  Vehicle sensors generate telemetry data including engine temperature, battery voltage, speed, vibration, and fuel
+                  consumption. Vehixa evaluates these streams against predefined safety thresholds and generates prioritized alerts
+                  when abnormal behavior is detected—then highlights the affected component directly on the 3D vehicle model.
                 </div>
-              </div>
+              </motion.div>
               <div className="md:col-span-5">
-                <div className="grid gap-3">
-                  <Magnetic>
-                    <Link
-                      to="/vehicles"
-                      className="flex items-center justify-between rounded-2xl border border-border/60 bg-background/30 px-5 py-4 text-sm font-semibold backdrop-blur transition hover:-translate-y-0.5"
+                <motion.div
+                  className="grid gap-3 text-sm text-muted-foreground"
+                  initial="hidden"
+                  whileInView="show"
+                  viewport={{ once: true, amount: 0.3 }}
+                  variants={stepsContainer}
+                >
+                  {[
+                    {
+                      title: 'Telemetry Data Collection',
+                      text: 'Vehicle sensors generate telemetry data including engine temperature, battery voltage, speed, vibration, and fuel consumption.',
+                    },
+                    {
+                      title: 'Fault Detection Engine',
+                      text: 'The system evaluates telemetry values against predefined safety thresholds to detect abnormal behavior.',
+                    },
+                    {
+                      title: 'Alert Generation',
+                      text: 'If abnormal conditions are detected, Vehixa generates alerts categorized as Critical, Warning, or Minor.',
+                    },
+                    {
+                      title: 'Visual Fault Highlighting',
+                      text: 'The affected vehicle component is highlighted on the 3D vehicle model to make the issue immediately visible.',
+                    },
+                  ].map((step, idx) => (
+                    <motion.div
+                      key={idx}
+                      variants={stepItem}
+                      whileHover={{ scale: 1.02 }}
+                      className="rounded-2xl border border-border/60 bg-background/30 px-5 py-4 backdrop-blur"
                     >
-                      Explore vehicles <ArrowRight className="h-4 w-4 opacity-80" />
-                    </Link>
-                  </Magnetic>
-                  <Magnetic>
-                    <Link
-                      to="/telemetry"
-                      className="flex items-center justify-between rounded-2xl border border-border/60 bg-background/30 px-5 py-4 text-sm font-semibold backdrop-blur transition hover:-translate-y-0.5"
-                    >
-                      Live telemetry <ArrowRight className="h-4 w-4 opacity-80" />
-                    </Link>
-                  </Magnetic>
-                  <div className="rounded-2xl border border-border/60 bg-background/20 px-5 py-4 text-sm text-muted-foreground">
-                    Tip: add a real asset later—this landing page is already shippable today.
-                  </div>
+                      <div className="text-xs font-semibold uppercase tracking-[0.26em] text-muted-foreground">Step {idx + 1}</div>
+                      <div className="mt-1 font-semibold text-foreground">{step.title}</div>
+                      <div className="mt-1">
+                        {step.text}
+                      </div>
+                    </motion.div>
+                  ))}
+                </motion.div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="alerts" className="mx-auto max-w-6xl px-4 pb-16 md:px-6 md:pb-24">
+          <div className="rounded-[28px] border border-border/60 bg-card/30 p-8 backdrop-blur md:p-10">
+            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.30em] text-muted-foreground">Alerts</div>
+                <div className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">Example Vehicle Fault Alerts</div>
+              </div>
+            </div>
+            <div className="mt-8 grid gap-4 md:grid-cols-2">
+              <div className="rounded-2xl border border-border/60 bg-background/25 p-5">
+                <div className="text-xs font-semibold uppercase tracking-[0.26em] text-destructive">Engine Overheating</div>
+                <div className="mt-2 text-sm font-semibold text-foreground">Severity: Critical</div>
+                <div className="mt-1 text-sm text-muted-foreground">
+                  Condition: Engine temperature exceeds 105°C
                 </div>
               </div>
+              <div className="rounded-2xl border border-border/60 bg-background/25 p-5">
+                <div className="text-xs font-semibold uppercase tracking-[0.26em] text-warning">Battery Voltage Drop</div>
+                <div className="mt-2 text-sm font-semibold text-foreground">Severity: Warning</div>
+                <div className="mt-1 text-sm text-muted-foreground">
+                  Condition: Battery voltage drops below safe operating levels
+                </div>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-background/25 p-5">
+                <div className="text-xs font-semibold uppercase tracking-[0.26em] text-warning">Sudden Brake Event</div>
+                <div className="mt-2 text-sm font-semibold text-foreground">Severity: Warning</div>
+                <div className="mt-1 text-sm text-muted-foreground">
+                  Condition: Rapid speed decrease detected
+                </div>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-background/25 p-5">
+                <div className="text-xs font-semibold uppercase tracking-[0.26em] text-muted-foreground">Fuel Efficiency Drop</div>
+                <div className="mt-2 text-sm font-semibold text-foreground">Severity: Minor</div>
+                <div className="mt-1 text-sm text-muted-foreground">
+                  Condition: Abnormal increase in fuel consumption
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="benefits" className="mx-auto max-w-6xl px-4 pb-16 md:px-6 md:pb-24">
+          <div className="grid gap-10 md:grid-cols-12 md:items-start">
+            <div className="md:col-span-5">
+              <div className="text-xs font-semibold uppercase tracking-[0.30em] text-muted-foreground">Benefits</div>
+              <div className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">Why Vehixa Matters</div>
+            </div>
+            <div className="md:col-span-7">
+              <div className="grid gap-3 rounded-3xl border border-border/60 bg-card/30 p-6 text-sm leading-relaxed text-muted-foreground backdrop-blur">
+                <div className="flex items-start gap-2">
+                  <span className="mt-[2px] h-1.5 w-1.5 rounded-full bg-primary" />
+                  <span>Prevent unexpected vehicle breakdowns</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="mt-[2px] h-1.5 w-1.5 rounded-full bg-primary" />
+                  <span>Detect faults before major damage occurs</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="mt-[2px] h-1.5 w-1.5 rounded-full bg-primary" />
+                  <span>Improve vehicle safety and reliability</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="mt-[2px] h-1.5 w-1.5 rounded-full bg-primary" />
+                  <span>Reduce maintenance costs through early detection</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="mt-[2px] h-1.5 w-1.5 rounded-full bg-primary" />
+                  <span>Provide real-time monitoring for fleet operators</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="testimonials" className="mx-auto max-w-6xl px-4 pb-16 md:px-6 md:pb-24">
+          <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.30em] text-muted-foreground">Testimonials</div>
+              <div className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">What Users Say</div>
+            </div>
+          </div>
+          <div className="mt-8 grid gap-4 md:grid-cols-3">
+            <div className="rounded-3xl border border-border/60 bg-card/30 p-6 text-sm leading-relaxed text-muted-foreground backdrop-blur">
+              <p>
+                "Vehixa makes vehicle diagnostics extremely intuitive. The 3D visualization helps identify faults instantly."
+              </p>
+            </div>
+            <div className="rounded-3xl border border-border/60 bg-card/30 p-6 text-sm leading-relaxed text-muted-foreground backdrop-blur">
+              <p>
+                "Instead of analyzing raw telemetry logs, we receive intelligent alerts that help us react immediately."
+              </p>
+            </div>
+            <div className="rounded-3xl border border-border/60 bg-card/30 p-6 text-sm leading-relaxed text-muted-foreground backdrop-blur">
+              <p>
+                "The combination of telemetry monitoring and visual fault detection makes this system powerful for fleet management."
+              </p>
             </div>
           </div>
         </section>
@@ -346,38 +551,41 @@ export default function LandingPage() {
             <div className="grid gap-10 md:grid-cols-12 md:items-center">
               <div className="md:col-span-7">
                 <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.30em] text-muted-foreground">
-                  <Shield className="h-4 w-4 text-primary" /> Ready
+                  <Shield className="h-4 w-4 text-primary" /> Get started
                 </div>
                 <div className="mt-4 text-4xl font-semibold leading-[1.0] tracking-tight md:text-6xl">
-                  Ship a landing page
-                  <br />
-                  that feels <span className="text-gradient">alive</span>.
+                  Experience Intelligent Vehicle Monitoring
                 </div>
                 <div className="mt-5 max-w-xl text-sm leading-relaxed text-muted-foreground md:text-base">
-                  This updates your theme + adds a 3D hero with postprocessing, layered motion effects, and clean CTAs into the
-                  existing console.
+                  Discover how Vehixa transforms raw telemetry data into actionable insights through real-time fault detection and
+                  immersive visualization.
                 </div>
               </div>
 
               <div className="md:col-span-5">
                 <div className="grid gap-3">
                   <Magnetic>
-                    <Link
-                      to="/dashboard"
+                    <button
+                      onClick={() => setLoginOpen(true)}
                       className="flex items-center justify-between rounded-2xl bg-[linear-gradient(90deg,hsl(var(--primary)),hsl(var(--accent)))] px-6 py-4 text-sm font-semibold text-background transition hover:-translate-y-0.5"
                     >
-                      Open the console <ArrowRight className="h-4 w-4" />
-                    </Link>
+                      Log in <ArrowRight className="h-4 w-4" />
+                    </button>
                   </Magnetic>
-                  <div className="rounded-2xl border border-border/60 bg-background/25 px-6 py-4 text-sm text-muted-foreground">
-                    Want it more insane? We can add scroll-synced camera moves, glitch typography, and section transitions.
-                  </div>
+                  <Magnetic>
+                    <button
+                      onClick={() => setSignupOpen(true)}
+                      className="flex items-center justify-between rounded-2xl border border-border/60 bg-background/25 px-6 py-4 text-sm font-semibold text-foreground backdrop-blur transition hover:-translate-y-0.5"
+                    >
+                      Get Started <ArrowRight className="h-4 w-4 opacity-80" />
+                    </button>
+                  </Magnetic>
                 </div>
               </div>
             </div>
 
             <div className="mt-10 border-t border-border/60 pt-6 text-xs font-semibold uppercase tracking-[0.30em] text-muted-foreground">
-              © {new Date().getFullYear()} · Telemetry Whisper
+              Vehixa – Transforming Vehicle Telemetry Into Intelligent Insights
             </div>
           </div>
         </section>

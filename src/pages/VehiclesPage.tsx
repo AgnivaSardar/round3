@@ -41,8 +41,8 @@ export default function VehiclesPage() {
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-foreground">Fleet Vehicles</h1>
-          <p className="text-sm text-muted-foreground">{vehicles.length} vehicles in fleet</p>
+          <h1 className="text-2xl font-heading font-bold text-foreground">Vehicles</h1>
+          <p className="text-sm text-muted-foreground">{vehicles.length} vehicles in Vehixa fleet</p>
         </div>
 
         {vehicles.length === 0 ? (

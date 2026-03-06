@@ -76,7 +76,7 @@ export default function DashboardPage() {
       <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-6">
         {/* Header */}
         <motion.div variants={itemVariants}>
-          <h1 className="text-2xl font-heading font-bold text-foreground">Fleet Dashboard</h1>
+          <h1 className="text-2xl font-heading font-bold text-foreground">Vehixa Dashboard</h1>
           <p className="text-sm text-muted-foreground">Real-time vehicle telemetry & fault monitoring</p>
         </motion.div>
 

@@ -72,7 +72,10 @@ export default function VehicleDetailPage() {
     <DashboardLayout>
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
         {/* Header */}
-        <div className="glass-card p-5 flex flex-col md:flex-row items-start md:items-center gap-6">
+        <motion.div
+          layoutId={`vehicle-card-${vehicle.id}`}
+          className="glass-card p-5 flex flex-col md:flex-row items-start md:items-center gap-6"
+        >
           <HealthScore score={vehicle.healthScore} />
           <div className="flex-1">
             <h1 className="text-xl font-heading font-bold text-foreground">{vehicle.name}</h1>
@@ -88,7 +91,7 @@ export default function VehicleDetailPage() {
           }`}>
             {vehicle.status}
           </div>
-        </div>
+        </motion.div>
 
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
