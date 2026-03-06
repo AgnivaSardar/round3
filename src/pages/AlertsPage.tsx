@@ -1,21 +1,43 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Filter } from 'lucide-react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { AlertCard } from '@/components/AlertCard';
-import { alerts as mockAlerts } from '@/data/mockData';
-import type { Alert } from '@/data/mockData';
+import { fetchAlerts, acknowledgeAlert } from '@/services/api';
+import type { Alert } from '@/services/api';
 
 type SeverityFilter = 'all' | 'critical' | 'warning' | 'anomaly';
 
 export default function AlertsPage() {
-  const [alertList, setAlertList] = useState<Alert[]>(mockAlerts);
+  const [alertList, setAlertList] = useState<Alert[]>([]);
   const [filter, setFilter] = useState<SeverityFilter>('all');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadAlerts();
+  }, []);
+
+  async function loadAlerts() {
+    setLoading(true);
+    try {
+      const data = await fetchAlerts();
+      setAlertList(data);
+    } catch (error) {
+      console.error('Error loading alerts:', error);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const filtered = filter === 'all' ? alertList : alertList.filter(a => a.severity === filter);
 
-  const handleAcknowledge = (id: string) => {
-    setAlertList(prev => prev.map(a => a.id === id ? { ...a, acknowledged: true } : a));
+  const handleAcknowledge = async (id: string) => {
+    try {
+      await acknowledgeAlert(id);
+      setAlertList(prev => prev.map(a => a.id === id ? { ...a, acknowledged: true, isResolved: true } : a));
+    } catch (error) {
+      console.error('Error acknowledging alert:', error);
+    }
   };
 
   const counts = {
@@ -31,6 +53,16 @@ export default function AlertsPage() {
     { key: 'warning', label: 'Warning', color: 'bg-warning/20 text-warning' },
     { key: 'anomaly', label: 'Anomaly', color: 'bg-anomaly/20 text-anomaly' },
   ];
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <p className="text-muted-foreground">Loading alerts...</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>

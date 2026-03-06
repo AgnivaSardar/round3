@@ -3,26 +3,55 @@ import { motion } from 'framer-motion';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { GaugeChart } from '@/components/GaugeChart';
-import { generateLiveTelemetry } from '@/data/mockData';
-import type { TelemetryPoint } from '@/data/mockData';
+import { fetchLiveTelemetry } from '@/services/api';
+import type { TelemetryPoint } from '@/services/api';
 import { Play, Pause, Radio } from 'lucide-react';
 
 export default function LiveTelemetryPage() {
   const [data, setData] = useState<TelemetryPoint[]>([]);
-  const [latest, setLatest] = useState(generateLiveTelemetry());
+  const [latest, setLatest] = useState<TelemetryPoint | null>(null);
   const [running, setRunning] = useState(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
+    async function fetchData() {
+      try {
+        const point = await fetchLiveTelemetry();
+        if (point) {
+          setLatest(point);
+          setData(prev => [...prev.slice(-30), point]);
+        }
+      } catch (error) {
+        console.error('Error fetching live telemetry:', error);
+      }
+    }
+
+    // Initial fetch
+    fetchData();
+
     if (running) {
       intervalRef.current = setInterval(() => {
-        const point = generateLiveTelemetry();
-        setLatest(point);
-        setData(prev => [...prev.slice(-30), point]);
-      }, 2000);
+        fetchData();
+      }, 3000); // Poll every 3 seconds
     }
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+    
+    return () => { 
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
   }, [running]);
+
+  const defaultPoint: TelemetryPoint = {
+    time: '00:00:00',
+    speed: 0,
+    engineTemp: 0,
+    batteryVoltage: 0,
+    fuelEfficiency: 0,
+    vibration: 0,
+  };
+
+  const currentPoint = latest || defaultPoint;
 
   return (
     <DashboardLayout>
@@ -47,10 +76,37 @@ export default function LiveTelemetryPage() {
         {/* Gauges */}
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass-card p-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 justify-items-center">
-            <GaugeChart value={latest.speed} max={180} label="Speed" unit="km/h" size={140} thresholds={{ warning: 120, critical: 150 }} />
-            <GaugeChart value={latest.engineTemp} max={130} label="Engine Temp" unit="°C" size={140} thresholds={{ warning: 95, critical: 110 }} />
-            <GaugeChart value={latest.batteryVoltage} max={14.5} label="Battery" unit="V" size={140} thresholds={{ warning: 11.5, critical: 10.5 }} />
-            <GaugeChart value={latest.fuelEfficiency} max={16} label="Fuel Eff." unit="km/L" size={140} />
+            <GaugeChart 
+              value={currentPoint.speed || 0} 
+              max={180} 
+              label="Speed" 
+              unit="km/h" 
+              size={140} 
+              thresholds={{ warning: 120, critical: 150 }} 
+            />
+            <GaugeChart 
+              value={currentPoint.engineTemp || 0} 
+              max={130} 
+              label="Engine Temp" 
+              unit="°C" 
+              size={140} 
+              thresholds={{ warning: 95, critical: 110 }} 
+            />
+            <GaugeChart 
+              value={currentPoint.batteryVoltage || 0} 
+              max={14.5} 
+              label="Battery" 
+              unit="V" 
+              size={140} 
+              thresholds={{ warning: 11.5, critical: 10.5 }} 
+            />
+            <GaugeChart 
+              value={currentPoint.fuelEfficiency || 0} 
+              max={16} 
+              label="Fuel Eff." 
+              unit="km/L" 
+              size={140} 
+            />
           </div>
         </motion.div>
 
@@ -76,6 +132,12 @@ export default function LiveTelemetryPage() {
             </div>
           ))}
         </div>
+
+        {data.length === 0 && (
+          <div className="glass-card p-8 text-center">
+            <p className="text-muted-foreground">No live telemetry data available. Make sure the backend is running and receiving data.</p>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

@@ -6,7 +6,8 @@ import { DashboardLayout } from '@/components/DashboardLayout';
 import { HealthScore } from '@/components/HealthScore';
 import { MetricCard } from '@/components/MetricCard';
 import { AlertCard } from '@/components/AlertCard';
-import { vehicles, alerts, faultLogs, generateTelemetryData } from '@/data/mockData';
+import { fetchVehicles, fetchAlerts, fetchTelemetry, fetchFaultLogs } from '@/services/api';
+import type { Vehicle, Alert, TelemetryPoint, FaultLog } from '@/services/api';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -18,14 +19,57 @@ const itemVariants = {
 };
 
 export default function DashboardPage() {
-  const [telemetry] = useState(generateTelemetryData);
-  const avgHealth = Math.round(vehicles.reduce((a, v) => a + v.healthScore, 0) / vehicles.length);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [telemetry, setTelemetry] = useState<TelemetryPoint[]>([]);
+  const [faultLogs, setFaultLogs] = useState<FaultLog[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      setLoading(true);
+      try {
+        const [vehiclesData, alertsData, telemetryData, faultLogsData] = await Promise.all([
+          fetchVehicles(),
+          fetchAlerts({ isResolved: false }),
+          fetchTelemetry(undefined, 24),
+          fetchFaultLogs(),
+        ]);
+        
+        setVehicles(vehiclesData);
+        setAlerts(alertsData);
+        setTelemetry(telemetryData);
+        setFaultLogs(faultLogsData);
+      } catch (error) {
+        console.error('Error loading dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    loadData();
+  }, []);
+
+  const avgHealth = vehicles.length > 0 
+    ? Math.round(vehicles.reduce((a, v) => a + v.healthScore, 0) / vehicles.length) 
+    : 0;
   const criticalCount = alerts.filter(a => a.severity === 'critical' && !a.acknowledged).length;
   const activeAlerts = alerts.filter(a => !a.acknowledged);
+  const latestTemp = telemetry.length > 0 ? telemetry[telemetry.length - 1]?.engineTemp || 0 : 0;
 
   const chartStyle = {
     background: 'transparent',
   };
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <p className="text-muted-foreground">Loading dashboard...</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -49,7 +93,7 @@ export default function DashboardPage() {
           </div>
           <MetricCard title="Total Vehicles" value={vehicles.length} icon={<Car className="h-4 w-4" />} subtitle="All active" trend="stable" />
           <MetricCard title="Active Alerts" value={activeAlerts.length} icon={<AlertTriangle className="h-4 w-4" />} subtitle={`${criticalCount} critical`} trend="up" />
-          <MetricCard title="Avg Engine Temp" value={`${telemetry[telemetry.length - 1].engineTemp.toFixed(0)}°C`} icon={<Thermometer className="h-4 w-4" />} subtitle="Normal range" trend="stable" />
+          <MetricCard title="Avg Engine Temp" value={`${latestTemp.toFixed(0)}°C`} icon={<Thermometer className="h-4 w-4" />} subtitle="Normal range" trend="stable" />
         </motion.div>
 
         {/* Charts */}
@@ -124,29 +168,37 @@ export default function DashboardPage() {
           <div className="glass-card p-4">
             <h3 className="text-sm font-heading uppercase tracking-wider text-muted-foreground mb-3">Active Alerts</h3>
             <div className="space-y-2">
-              {activeAlerts.slice(0, 4).map(a => (
-                <AlertCard key={a.id} alert={a} compact />
-              ))}
+              {activeAlerts.length > 0 ? (
+                activeAlerts.slice(0, 4).map(a => (
+                  <AlertCard key={a.id} alert={a} compact />
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground py-4 text-center">No active alerts</p>
+              )}
             </div>
           </div>
 
           <div className="glass-card p-4">
             <h3 className="text-sm font-heading uppercase tracking-wider text-muted-foreground mb-3">Recent Fault Logs</h3>
             <div className="space-y-2">
-              {faultLogs.map(f => (
-                <div key={f.id} className="flex items-center gap-3 px-3 py-2 rounded-md bg-secondary/50">
-                  <div className={`h-2 w-2 rounded-full ${
-                    f.severity === 'critical' ? 'bg-destructive' : f.severity === 'warning' ? 'bg-warning' : 'bg-anomaly'
-                  }`} />
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm font-medium text-foreground truncate block">{f.fault}</span>
-                    <span className="text-xs text-muted-foreground">{f.vehicleName}</span>
+              {faultLogs.length > 0 ? (
+                faultLogs.slice(0, 5).map(f => (
+                  <div key={f.id} className="flex items-center gap-3 px-3 py-2 rounded-md bg-secondary/50">
+                    <div className={`h-2 w-2 rounded-full ${
+                      f.severity === 'critical' ? 'bg-destructive' : f.severity === 'warning' ? 'bg-warning' : 'bg-anomaly'
+                    }`} />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium text-foreground truncate block">{f.fault}</span>
+                      <span className="text-xs text-muted-foreground">{f.vehicleName}</span>
+                    </div>
+                    <span className={`text-xs ${f.resolved ? 'text-success' : 'text-muted-foreground'}`}>
+                      {f.resolved ? '✓ Resolved' : 'Open'}
+                    </span>
                   </div>
-                  <span className={`text-xs ${f.resolved ? 'text-success' : 'text-muted-foreground'}`}>
-                    {f.resolved ? '✓ Resolved' : 'Open'}
-                  </span>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground py-4 text-center">No fault logs</p>
+              )}
             </div>
           </div>
         </motion.div>

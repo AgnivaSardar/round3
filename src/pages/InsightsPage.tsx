@@ -1,10 +1,51 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { DashboardLayout } from '@/components/DashboardLayout';
-import { insightsData } from '@/data/mockData';
+import { fetchInsights } from '@/services/api';
+import type { InsightsData } from '@/services/api';
 import { TrendingUp, PieChart as PieIcon, BarChart3 } from 'lucide-react';
 
 export default function InsightsPage() {
+  const [insightsData, setInsightsData] = useState<InsightsData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadInsights() {
+      setLoading(true);
+      try {
+        const data = await fetchInsights();
+        setInsightsData(data);
+      } catch (error) {
+        console.error('Error loading insights:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    loadInsights();
+  }, []);
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <p className="text-muted-foreground">Loading insights...</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!insightsData) {
+    return (
+      <DashboardLayout>
+        <div className="glass-card p-8 text-center">
+          <p className="text-muted-foreground">No insights data available</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout>
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
@@ -19,19 +60,25 @@ export default function InsightsPage() {
             <h3 className="text-sm font-heading uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
               <BarChart3 className="h-4 w-4 text-primary" /> Most Common Faults
             </h3>
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={insightsData.commonFaults} layout="vertical" margin={{ left: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 18%)" />
-                <XAxis type="number" stroke="hsl(215, 15%, 55%)" fontSize={10} />
-                <YAxis type="category" dataKey="name" stroke="hsl(215, 15%, 55%)" fontSize={11} width={120} />
-                <Tooltip contentStyle={{ background: 'hsl(220, 18%, 10%)', border: '1px solid hsl(220, 13%, 18%)', borderRadius: 8, fontSize: 12 }} />
-                <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                  {insightsData.commonFaults.map((entry, i) => (
-                    <Cell key={i} fill={entry.fill} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            {insightsData.commonFaults.length > 0 ? (
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={insightsData.commonFaults} layout="vertical" margin={{ left: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 18%)" />
+                  <XAxis type="number" stroke="hsl(215, 15%, 55%)" fontSize={10} />
+                  <YAxis type="category" dataKey="name" stroke="hsl(215, 15%, 55%)" fontSize={11} width={120} />
+                  <Tooltip contentStyle={{ background: 'hsl(220, 18%, 10%)', border: '1px solid hsl(220, 13%, 18%)', borderRadius: 8, fontSize: 12 }} />
+                  <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                    {insightsData.commonFaults.map((entry, i) => (
+                      <Cell key={i} fill={entry.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[280px] flex items-center justify-center">
+                <p className="text-sm text-muted-foreground">No fault data available</p>
+              </div>
+            )}
           </div>
 
           {/* Severity Breakdown Pie Chart */}
@@ -39,28 +86,34 @@ export default function InsightsPage() {
             <h3 className="text-sm font-heading uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
               <PieIcon className="h-4 w-4 text-accent" /> Alert Severity Breakdown
             </h3>
-            <ResponsiveContainer width="100%" height={280}>
-              <PieChart>
-                <Pie
-                  data={insightsData.severityBreakdown}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={4}
-                  dataKey="value"
-                  stroke="none"
-                >
-                  {insightsData.severityBreakdown.map((entry, i) => (
-                    <Cell key={i} fill={entry.fill} />
-                  ))}
-                </Pie>
-                <Legend
-                  formatter={(value) => <span style={{ color: 'hsl(210, 20%, 85%)', fontSize: 12 }}>{value}</span>}
-                />
-                <Tooltip contentStyle={{ background: 'hsl(220, 18%, 10%)', border: '1px solid hsl(220, 13%, 18%)', borderRadius: 8, fontSize: 12 }} />
-              </PieChart>
-            </ResponsiveContainer>
+            {insightsData.severityBreakdown.length > 0 && insightsData.severityBreakdown.some(s => s.value > 0) ? (
+              <ResponsiveContainer width="100%" height={280}>
+                <PieChart>
+                  <Pie
+                    data={insightsData.severityBreakdown}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={4}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                    {insightsData.severityBreakdown.map((entry, i) => (
+                      <Cell key={i} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <Legend
+                    formatter={(value) => <span style={{ color: 'hsl(210, 20%, 85%)', fontSize: 12 }}>{value}</span>}
+                  />
+                  <Tooltip contentStyle={{ background: 'hsl(220, 18%, 10%)', border: '1px solid hsl(220, 13%, 18%)', borderRadius: 8, fontSize: 12 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[280px] flex items-center justify-center">
+                <p className="text-sm text-muted-foreground">No severity data available</p>
+              </div>
+            )}
           </div>
 
           {/* Top Alert Vehicles */}
@@ -68,15 +121,21 @@ export default function InsightsPage() {
             <h3 className="text-sm font-heading uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-warning" /> Vehicles with Highest Alert Frequency
             </h3>
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={insightsData.topAlertVehicles}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 18%)" />
-                <XAxis dataKey="vehicle" stroke="hsl(215, 15%, 55%)" fontSize={11} />
-                <YAxis stroke="hsl(215, 15%, 55%)" fontSize={10} />
-                <Tooltip contentStyle={{ background: 'hsl(220, 18%, 10%)', border: '1px solid hsl(220, 13%, 18%)', borderRadius: 8, fontSize: 12 }} />
-                <Bar dataKey="alerts" fill="hsl(199, 89%, 48%)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {insightsData.topAlertVehicles.length > 0 ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={insightsData.topAlertVehicles}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 18%)" />
+                  <XAxis dataKey="vehicle" stroke="hsl(215, 15%, 55%)" fontSize={11} />
+                  <YAxis stroke="hsl(215, 15%, 55%)" fontSize={10} />
+                  <Tooltip contentStyle={{ background: 'hsl(220, 18%, 10%)', border: '1px solid hsl(220, 13%, 18%)', borderRadius: 8, fontSize: 12 }} />
+                  <Bar dataKey="alerts" fill="hsl(199, 89%, 48%)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[240px] flex items-center justify-center">
+                <p className="text-sm text-muted-foreground">No vehicle alert data available</p>
+              </div>
+            )}
           </div>
         </div>
       </motion.div>

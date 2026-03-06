@@ -1,23 +1,61 @@
+import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { HealthScore } from '@/components/HealthScore';
 import { AlertCard } from '@/components/AlertCard';
-import { vehicles, alerts, generateTelemetryData } from '@/data/mockData';
+import { fetchVehicle, fetchAlerts, fetchTelemetry } from '@/services/api';
+import type { Vehicle, Alert, TelemetryPoint } from '@/services/api';
 import { Car, User, Gauge, MapPin } from 'lucide-react';
 
 export default function VehicleDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const vehicle = vehicles.find(v => v.id === id);
-  const vehicleAlerts = alerts.filter(a => a.vehicleId === id);
-  const telemetry = generateTelemetryData();
+  const [vehicle, setVehicle] = useState<Vehicle | null>(null);
+  const [vehicleAlerts, setVehicleAlerts] = useState<Alert[]>([]);
+  const [telemetry, setTelemetry] = useState<TelemetryPoint[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadVehicleData() {
+      if (!id) return;
+      
+      setLoading(true);
+      try {
+        const [vehicleData, alertsData, telemetryData] = await Promise.all([
+          fetchVehicle(id),
+          fetchAlerts({ vehicleId: id }),
+          fetchTelemetry(id, 24),
+        ]);
+        
+        setVehicle(vehicleData || null);
+        setVehicleAlerts(alertsData);
+        setTelemetry(telemetryData);
+      } catch (error) {
+        console.error('Error loading vehicle data:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    loadVehicleData();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <p className="text-muted-foreground">Loading vehicle...</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   if (!vehicle) {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center h-96">
-          <p className="text-muted-foreground">Select a vehicle from the sidebar</p>
+          <p className="text-muted-foreground">Vehicle not found</p>
         </div>
       </DashboardLayout>
     );
@@ -42,7 +80,7 @@ export default function VehicleDetailPage() {
               <span className="flex items-center gap-1"><Car className="h-3.5 w-3.5" /> {vehicle.type}</span>
               <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {vehicle.plate}</span>
               <span className="flex items-center gap-1"><User className="h-3.5 w-3.5" /> {vehicle.driver}</span>
-              <span className="flex items-center gap-1"><Gauge className="h-3.5 w-3.5" /> {vehicle.mileage.toLocaleString()} km</span>
+              <span className="flex items-center gap-1"><Gauge className="h-3.5 w-3.5" /> {Math.round(vehicle.mileage).toLocaleString()} km</span>
             </div>
           </div>
           <div className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase ${

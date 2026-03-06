@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { AlertTriangle, AlertCircle, Info, Check } from 'lucide-react';
-import type { Alert } from '@/data/mockData';
+import type { Alert } from '@/services/api';
 
 interface AlertCardProps {
   alert: Alert;

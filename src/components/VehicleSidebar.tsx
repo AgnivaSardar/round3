@@ -1,12 +1,27 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
-import { vehicles } from '@/data/mockData';
+import { fetchVehicles } from '@/services/api';
+import type { Vehicle } from '@/services/api';
 
 export function VehicleSidebar() {
   const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = useState(false);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const location = useLocation();
+
+  useEffect(() => {
+    async function loadVehicles() {
+      try {
+        const data = await fetchVehicles();
+        setVehicles(data);
+      } catch (error) {
+        console.error('Error loading vehicles:', error);
+      }
+    }
+    
+    loadVehicles();
+  }, []);
 
   const filtered = vehicles.filter(v =>
     v.name.toLowerCase().includes(search.toLowerCase()) ||
