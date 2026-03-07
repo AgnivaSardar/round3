@@ -7,7 +7,7 @@ import { HealthScore } from '@/components/HealthScore';
 import { AlertCard } from '@/components/AlertCard';
 import { fetchVehicle, fetchAlerts, fetchTelemetry } from '@/services/api';
 import type { Vehicle, Alert, TelemetryPoint } from '@/services/api';
-import { Car, User, Gauge, MapPin } from 'lucide-react';
+import { Car, User, Gauge, MapPin, Download } from 'lucide-react';
 
 const chartConfigs: Array<{
   key: keyof TelemetryPoint;
@@ -75,6 +75,24 @@ const toMinuteLabel = (recordedAt?: string): string => {
     hour12: false,
   });
 };
+
+const csvEscape = (value: unknown): string => {
+  const text =
+    value === null || value === undefined
+      ? ''
+      : typeof value === 'object'
+      ? JSON.stringify(value)
+      : String(value);
+
+  const escaped = text.replace(/"/g, '""');
+  return /[",\n]/.test(escaped) ? `"${escaped}"` : escaped;
+};
+
+const toSafeFileToken = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 
 const VEHICLE_DETAIL_POLL_MS = 5000;
 
@@ -173,6 +191,75 @@ export default function VehicleDetailPage() {
     : vehicle.latestTelemetry || null;
 
   const telemetryHistory = [...telemetry].reverse();
+
+  const downloadTelemetryHistoryCsv = () => {
+    if (telemetryHistory.length === 0) return;
+
+    const headers = [
+      'recordedAt',
+      'time',
+      'engineRpm',
+      'engineTemp',
+      'coolantTemp',
+      'lubOilPressure',
+      'fuelPressure',
+      'batteryVoltage',
+      'speed',
+      'mileage',
+      'vibrationLevel',
+      'fuelEfficiency',
+      'errorCodesCount',
+      'ambientTemperature',
+      'batteryStateOfCharge',
+      'motorTemp',
+      'inverterTemp',
+      'source',
+    ];
+
+    const lines = [headers.map(csvEscape).join(',')];
+
+    telemetryHistory.forEach((point) => {
+      const row = [
+        point.recordedAt ?? '',
+        point.time ?? '',
+        point.engineRpm ?? '',
+        point.engineTemp ?? '',
+        point.coolantTemp ?? '',
+        point.lubOilPressure ?? '',
+        point.fuelPressure ?? '',
+        point.batteryVoltage ?? '',
+        point.speed ?? '',
+        point.mileage ?? '',
+        point.vibrationLevel ?? '',
+        point.fuelEfficiency ?? '',
+        point.errorCodesCount ?? '',
+        point.ambientTemperature ?? '',
+        point.batteryStateOfCharge ?? '',
+        point.motorTemp ?? '',
+        point.inverterTemp ?? '',
+        point.source ?? '',
+      ];
+
+      lines.push(row.map(csvEscape).join(','));
+    });
+
+    const csv = lines.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+
+    const vehicleLabel = vehicle.plate || vehicle.name || vehicle.vehicleId || vehicle.id;
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const fileName = `telemetry-history-${toSafeFileToken(vehicleLabel)}-${timestamp}.csv`;
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <DashboardLayout>
@@ -290,9 +377,20 @@ export default function VehicleDetailPage() {
 
         {/* Minute-wise historical telemetry table */}
         <div className="glass-card p-4">
-          <h3 className="text-sm font-heading uppercase tracking-wider text-muted-foreground mb-3">
-            Telemetry History (Minute-wise)
-          </h3>
+          <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <h3 className="text-sm font-heading uppercase tracking-wider text-muted-foreground">
+              Telemetry History (Minute-wise)
+            </h3>
+            <button
+              type="button"
+              onClick={downloadTelemetryHistoryCsv}
+              disabled={telemetryHistory.length === 0}
+              className="inline-flex items-center gap-2 rounded-md border border-border bg-secondary/40 px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-secondary/70 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Download CSV
+            </button>
+          </div>
 
           {telemetryHistory.length > 0 ? (
             <div className="overflow-x-auto scrollbar-thin">

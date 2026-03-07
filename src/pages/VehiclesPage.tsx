@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { HealthScore } from '@/components/HealthScore';
-import { fetchVehicles, fetchTelemetry } from '@/services/api';
-import type { Vehicle, TelemetryPoint } from '@/services/api';
-import { Car, User, Gauge } from 'lucide-react';
+import { fetchVehicles, fetchTelemetry, fetchAlerts } from '@/services/api';
+import type { Vehicle, TelemetryPoint, Alert } from '@/services/api';
+import { Car, User, Gauge, Download } from 'lucide-react';
 
 const latestMetricDefinitions: Array<{
   key: keyof TelemetryPoint;
@@ -60,8 +60,38 @@ const toMinuteLabel = (recordedAt?: string): string => {
   });
 };
 
-const VEHICLES_LIST_POLL_MS = 15000;
-const VEHICLE_TELEMETRY_POLL_MS = 5000;
+const csvEscape = (value: unknown): string => {
+  const text =
+    value === null || value === undefined
+      ? ''
+      : typeof value === 'object'
+      ? JSON.stringify(value)
+      : String(value);
+
+  const escaped = text.replace(/"/g, '""');
+  return /[",\n]/.test(escaped) ? `"${escaped}"` : escaped;
+};
+
+const toSafeFileToken = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+const VEHICLES_LIST_POLL_MS = 8000;
+const VEHICLE_TELEMETRY_POLL_MS = 3000;
+const CRITICAL_ALERT_POLL_MS = 3000;
+const CRITICAL_ALERT_MODAL_MS = 5000;
+
+interface CriticalAlertModalState {
+  id: string;
+  title: string;
+  message: string;
+  vehicleName?: string;
+  timestamp?: string | Date;
+}
+
+const getAlertIdentity = (alert: Alert): string | null => alert.alertId || alert.id || null;
 
 export default function VehiclesPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -69,6 +99,40 @@ export default function VehiclesPage() {
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
   const [telemetryHistory, setTelemetryHistory] = useState<TelemetryPoint[]>([]);
   const [telemetryLoading, setTelemetryLoading] = useState(false);
+  const [criticalAlertModal, setCriticalAlertModal] = useState<CriticalAlertModalState | null>(null);
+  const alertDismissTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seenCriticalAlertIdsRef = useRef<Set<string>>(new Set());
+  const criticalAlertsPrimedRef = useRef(false);
+
+  const showCriticalAlertModalForFiveSeconds = (alert: Alert) => {
+    const alertId = getAlertIdentity(alert);
+    if (!alertId) return;
+
+    setCriticalAlertModal({
+      id: alertId,
+      title: alert.type || 'Critical alert detected',
+      message: alert.message,
+      vehicleName: alert.vehicleName,
+      timestamp: alert.timestamp,
+    });
+
+    if (alertDismissTimeoutRef.current) {
+      clearTimeout(alertDismissTimeoutRef.current);
+    }
+
+    alertDismissTimeoutRef.current = setTimeout(() => {
+      setCriticalAlertModal((current) => (current?.id === alertId ? null : current));
+      alertDismissTimeoutRef.current = null;
+    }, CRITICAL_ALERT_MODAL_MS);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (alertDismissTimeoutRef.current) {
+        clearTimeout(alertDismissTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -178,6 +242,66 @@ export default function VehiclesPage() {
     };
   }, [selectedVehicleId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    let inFlight = false;
+    let intervalId = null;
+
+    async function pollCriticalAlerts() {
+      if (inFlight) return;
+      inFlight = true;
+
+      try {
+        const criticalAlerts = await fetchAlerts({
+          severity: 'CRITICAL',
+          isResolved: false,
+          limit: 30,
+        });
+
+        if (cancelled) return;
+
+        const criticalAlertIds = criticalAlerts
+          .map((alert) => getAlertIdentity(alert))
+          .filter((id): id is string => Boolean(id));
+
+        if (!criticalAlertsPrimedRef.current) {
+          criticalAlertIds.forEach((id) => seenCriticalAlertIdsRef.current.add(id));
+          criticalAlertsPrimedRef.current = true;
+          return;
+        }
+
+        const newCriticalAlert = criticalAlerts.find((alert) => {
+          const alertId = getAlertIdentity(alert);
+          return Boolean(alertId) && !seenCriticalAlertIdsRef.current.has(alertId);
+        });
+
+        criticalAlertIds.forEach((id) => seenCriticalAlertIdsRef.current.add(id));
+
+        if (newCriticalAlert) {
+          showCriticalAlertModalForFiveSeconds(newCriticalAlert);
+        }
+      } catch (error) {
+        console.error('Error polling critical alerts:', error);
+      } finally {
+        inFlight = false;
+      }
+    }
+
+    void pollCriticalAlerts();
+
+    intervalId = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      void pollCriticalAlerts();
+    }, CRITICAL_ALERT_POLL_MS);
+
+    return () => {
+      cancelled = true;
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, []);
+
   const selectedVehicle = vehicles.find(
     (vehicle) => (vehicle.vehicleId || vehicle.id) === selectedVehicleId
   );
@@ -187,6 +311,77 @@ export default function VehiclesPage() {
     : selectedVehicle?.latestTelemetry || null;
 
   const telemetryRows = [...telemetryHistory].reverse();
+
+  const downloadTelemetryHistoryCsv = () => {
+    if (telemetryRows.length === 0) return;
+
+    const headers = [
+      'recordedAt',
+      'time',
+      'engineRpm',
+      'engineTemp',
+      'coolantTemp',
+      'lubOilPressure',
+      'fuelPressure',
+      'batteryVoltage',
+      'speed',
+      'mileage',
+      'vibrationLevel',
+      'fuelEfficiency',
+      'errorCodesCount',
+      'ambientTemperature',
+      'batteryStateOfCharge',
+      'motorTemp',
+      'inverterTemp',
+      'source',
+    ];
+
+    const lines = [headers.map(csvEscape).join(',')];
+
+    telemetryRows.forEach((point) => {
+      const row = [
+        point.recordedAt ?? '',
+        point.time ?? '',
+        point.engineRpm ?? '',
+        point.engineTemp ?? '',
+        point.coolantTemp ?? '',
+        point.lubOilPressure ?? '',
+        point.fuelPressure ?? '',
+        point.batteryVoltage ?? '',
+        point.speed ?? '',
+        point.mileage ?? '',
+        point.vibrationLevel ?? '',
+        point.fuelEfficiency ?? '',
+        point.errorCodesCount ?? '',
+        point.ambientTemperature ?? '',
+        point.batteryStateOfCharge ?? '',
+        point.motorTemp ?? '',
+        point.inverterTemp ?? '',
+        point.source ?? '',
+      ];
+
+      lines.push(row.map(csvEscape).join(','));
+    });
+
+    const csv = lines.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+
+    const vehicleLabel =
+      selectedVehicle?.plate || selectedVehicle?.name || selectedVehicleId || 'vehicle';
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const fileName = `telemetry-history-${toSafeFileToken(vehicleLabel)}-${timestamp}.csv`;
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(url);
+  };
 
   if (loading) {
     return (
@@ -319,9 +514,20 @@ export default function VehiclesPage() {
             </div>
 
             <div className="glass-card p-4">
-              <h3 className="text-sm font-heading uppercase tracking-wider text-muted-foreground mb-3">
-                Minute-wise Telemetry History
-              </h3>
+              <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <h3 className="text-sm font-heading uppercase tracking-wider text-muted-foreground">
+                  Minute-wise Telemetry History
+                </h3>
+                <button
+                  type="button"
+                  onClick={downloadTelemetryHistoryCsv}
+                  disabled={telemetryRows.length === 0}
+                  className="inline-flex items-center gap-2 rounded-md border border-border bg-secondary/40 px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-secondary/70 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Download CSV
+                </button>
+              </div>
 
               {telemetryLoading ? (
                 <p className="text-sm text-muted-foreground py-4">Loading telemetry history...</p>
@@ -377,6 +583,36 @@ export default function VehiclesPage() {
               ) : (
                 <p className="text-sm text-muted-foreground py-4">No telemetry history available</p>
               )}
+            </div>
+          </div>
+        )}
+
+        {criticalAlertModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/75 px-4 backdrop-blur-sm">
+            <div className="w-full max-w-lg rounded-xl border border-destructive/40 bg-card p-5 shadow-2xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-destructive">
+                Critical Alert
+              </p>
+
+              <h3 className="mt-2 text-lg font-heading font-semibold text-foreground">
+                {criticalAlertModal.title || 'Critical fault detected'}
+              </h3>
+
+              <p className="mt-2 text-sm text-muted-foreground">
+                {criticalAlertModal.message || 'A critical vehicle issue was detected.'}
+              </p>
+
+              {criticalAlertModal.vehicleName ? (
+                <p className="mt-3 text-sm text-foreground">
+                  Vehicle: <span className="font-medium">{criticalAlertModal.vehicleName}</span>
+                </p>
+              ) : null}
+
+              <div className="mt-4 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                {criticalAlertModal.timestamp
+                  ? `Detected at ${new Date(criticalAlertModal.timestamp).toLocaleString()} - auto-closing in 5 seconds`
+                  : 'Immediate attention required - auto-closing in 5 seconds'}
+              </div>
             </div>
           </div>
         )}
