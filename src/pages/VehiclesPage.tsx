@@ -102,7 +102,6 @@ export default function VehiclesPage() {
   const [criticalAlertModal, setCriticalAlertModal] = useState<CriticalAlertModalState | null>(null);
   const alertDismissTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seenCriticalAlertIdsRef = useRef<Set<string>>(new Set());
-  const criticalAlertsPrimedRef = useRef(false);
 
   const showCriticalAlertModalForFiveSeconds = (alert: Alert) => {
     const alertId = getAlertIdentity(alert);
@@ -263,12 +262,6 @@ export default function VehiclesPage() {
         const criticalAlertIds = criticalAlerts
           .map((alert) => getAlertIdentity(alert))
           .filter((id): id is string => Boolean(id));
-
-        if (!criticalAlertsPrimedRef.current) {
-          criticalAlertIds.forEach((id) => seenCriticalAlertIdsRef.current.add(id));
-          criticalAlertsPrimedRef.current = true;
-          return;
-        }
 
         const newCriticalAlert = criticalAlerts.find((alert) => {
           const alertId = getAlertIdentity(alert);
