@@ -1,77 +1,164 @@
-# Welcome to your Lovable project
+# Round3 Fleet Telemetry Dashboard
 
-## Project info
+A modern, responsive web application for monitoring vehicle fleets in real‑time. Built with **React**, **TypeScript**, **Vite**, **Tailwind CSS**, and the **shadcn/ui** component library, this project provides dashboards, alerts, vehicle management, and telemetry visualization backed by a RESTful API.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## 🚀 Features
 
-## How can I edit this code?
+- **Interactive dashboards** with charts and metrics
+- Real‑time **vehicle telemetry** (temperature, RPM, speed, etc.)
+- **Health scoring** and **fault log** tracking
+- **Alerts panel** with unresolved/resolved filtering
+- Vehicle **detail pages** with historical data
+- Support for **adding and editing** vehicles
+- Client‑side routing via `react-router-dom`
+- Dark/light theme toggle with `next-themes`
+- Smooth animations using `framer-motion`
+- 3D vehicle hero scene powered by `react-three-fiber` and `three.js`
+- Fully responsive and accessible UI built with Radix/Headless components
 
-There are several ways of editing your application.
+## 📦 Technology Stack
 
-**Use Lovable**
+| Category | Tools & Libraries |
+|----------|------------------|
+| Framework | React 18 |
+| Language | TypeScript |
+| Build | Vite |
+| Styling | Tailwind CSS, shadcn/ui |
+| UI Primitives | Radix UI (@radix-ui/*) |
+| State & Data | @tanstack/react-query, React Context |
+| HTTP | Axios |
+| Validation | Zod, react-hook-form |
+| Charts | Recharts, lucide-react icons |
+| 3D | three.js, @react-three/fiber, @react-three/drei |
+| Animations | Framer Motion |
+| Testing | Vitest, Testing Library |
+| Linting | ESLint |
+| Utilities | clsx, date-fns, sonner, tailwind-merge |
+| Version control | Git (compatible with GitHub / Lovable) |
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## 🗂️ Project Structure
 
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```
+├── public/                # Static assets
+├── src/
+│   ├── components/        # Reusable UI components
+│   │   ├── ui/            # shadcn‑ui primitives and wrappers
+│   │   ├── motion/        # animation helpers
+│   │   └── three/         # 3D scenes
+│   ├── hooks/             # Custom React hooks
+│   ├── lib/               # Shared utility functions
+│   ├── pages/             # Route‑level page components
+│   ├── services/          # API wrappers and type definitions
+│   ├── test/              # Vitest setup and example tests
+│   └── App.tsx            # Root component and router
+├── package.json           # Dependencies & scripts
+├── tsconfig.json          # TypeScript configuration
+└── vite.config.ts         # Vite configuration
 ```
 
-**Edit a file directly in GitHub**
+### Notable directories
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- `src/pages/` contains each screen of the application (Dashboard, Vehicles, Alerts, etc.)
+- `src/components/` houses both domain‑specific cards and shared UI primitives
+- `src/services/api.ts` centralizes all network requests and TypeScript interfaces
+- `src/hooks/` contains helpers like `useToast` and mobile detection
 
-**Use GitHub Codespaces**
+## 🛠️ Getting Started
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+1. **Clone the repository**
 
-## What technologies are used for this project?
+   ```bash
+   git clone <YOUR_GIT_URL>
+   cd round3
+   ```
 
-This project is built with:
+2. **Install dependencies**
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+   ```bash
+   npm install
+   ```
 
-## How can I deploy this project?
+3. **Start the development server**
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+   ```bash
+   npm run dev
+   ```
 
-## Can I connect a custom domain to my Lovable project?
+   Open [http://localhost:5173](http://localhost:5173) in your browser. Changes hot‑reload automatically.
 
-Yes, you can!
+## 📋 Available Scripts
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start Vite dev server |
+| `npm run build` | Production build |
+| `npm run build:dev` | Build with development mode |
+| `npm run preview` | Preview production build locally |
+| `npm run lint` | Run ESLint across project |
+| `npm run test` | Run Vitest once |
+| `npm run test:watch` | Watch tests in development |
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## 🧪 Testing
 
-# round-3-final
+- Setup in `src/test/setup.ts`.
+- Example spec in `src/test/example.test.ts`.
+- Use Vitest’s familiar `describe/it` API and Testing Library for DOM assertions.
+- Run `npm run test` or `npm run test:watch` during development.
 
-# round3
+## 🧹 Linting & Formatting
+
+- ESLint configured via `eslint.config.js` with React and TypeScript rules.
+- Tailwind’s `@tailwindcss/typography` plugin is installed.
+- Run `npm run lint` to catch issues early.
+
+## 📐 Styling & UI
+
+- Tailwind CSS is configured in `tailwind.config.ts`.
+- UI primitives live under `src/components/ui`.
+- Custom design patterns leverage `class-variance-authority` and `clsx`.
+- Theme switching via `next-themes` integrated into `ThemeToggle`.
+
+## 📁 API & Types
+
+`src/services/api.ts` exports functions like `fetchVehicles`, `fetchTelemetry`, etc., each returning typed data:
+
+```ts
+type Vehicle = { id: string; vehicleId?: string; healthScore: number; ... };
+```
+
+Add new endpoints or types here when backend contract evolves.
+
+## 📦 Deployment
+
+Build for production:
+
+```bash
+npm run build
+```
+
+The output folder is `dist/`. Serve it with any static host (Vercel, Netlify, GitHub Pages, etc.).
+
+> This project was originally scaffolded with Lovable; you can continue deploying through that platform or use standard GitHub workflows.
+
+## 🧩 Extending the App
+
+1. **New page**: Add file under `src/pages`, update router in `App.tsx`.
+2. **New component**: Place in `src/components/` or `src/components/ui`.
+3. **API call**: Extend `services/api.ts` and add corresponding types.
+4. **Styling**: Use Tailwind utility classes or extend `tailwind.config.ts`.
+5. **Animations**: Leverage `framer-motion` helpers in `src/components/motion`.
+
+## 📚 Contribution Guidelines
+
+- Follow existing code style and TypeScript strictness.
+- Add tests for new functionality.
+- Run lint and fix warnings before submitting PR.
+- Use descriptive commit messages.
+
+## 📝 License
+
+Specify your license here (e.g., MIT) or remove this section as appropriate.
+
+---
+
+*Last updated: March 7, 2026*
