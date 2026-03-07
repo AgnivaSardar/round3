@@ -1,245 +1,361 @@
-import { useState, useEffect } from "react";
-import { User, MapPin, TrendingUp, Award } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { useEffect, useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
+import { Car, Mail, Phone, Plus, Shield, UserCheck, Users } from 'lucide-react';
+import { DashboardLayout } from '@/components/DashboardLayout';
+import { toast } from '@/components/ui/use-toast';
+import {
+  assignDriverVehicle,
+  fetchDrivers,
+  fetchDriverStats,
+  fetchVehicles,
+  upsertDriverProfile,
+} from '@/services/api';
+import type { DriverProfile, DriverStats, Vehicle } from '@/services/api';
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+const safeLabel = (value?: string | null): string => value || '--';
 
-interface DriverStats {
-  total: number;
-  available: number;
-  onTrip: number;
-  offDuty: number;
-  avgSafetyScore: number;
-}
+const getVehicleIdentifier = (vehicle: Vehicle): string => vehicle.vehicleId || vehicle.id;
 
-interface Driver {
-  id: string;
-  userId: string;
-  licenseExpiry: string | null;
-  safetyScore: number;
-  milesThisMonth: number;
-  totalIncidents: number;
-  onTimeRate: number;
-  yearsExperience: number;
-  status: string;
-  user: {
-    name: string;
-    email: string;
-    phone: string | null;
-  };
-  assignedVehicle: {
-    vehicleNumber: string;
-    manufacturer: string;
-    model: string;
-    status: string;
-    fuelLevel: number | null;
-  } | null;
-}
+const getStatusClasses = (status: DriverProfile['status']): string => {
+  if (status === 'AVAILABLE') return 'status-optimal';
+  if (status === 'ON_TRIP') return 'status-anomaly';
+  return 'status-warning';
+};
 
 export default function DriversPage() {
   const [stats, setStats] = useState<DriverStats | null>(null);
-  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [drivers, setDrivers] = useState<DriverProfile[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchDriverData();
-  }, []);
-
-  const fetchDriverData = async () => {
+  const refreshDriverData = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const [statsRes, driversRes] = await Promise.all([
-        fetch(`${API_BASE}/drivers/stats`),
-        fetch(`${API_BASE}/drivers`),
+      const [statsData, listData, vehicleData] = await Promise.all([
+        fetchDriverStats(),
+        fetchDrivers(),
+        fetchVehicles(),
       ]);
 
-      const statsData = await statsRes.json();
-      const driversData = await driversRes.json();
-
-      if (statsData.success) setStats(statsData.data);
-      if (driversData.success) setDrivers(driversData.data);
+      setStats(statsData);
+      setDrivers(listData);
+      setVehicles(vehicleData);
     } catch (error) {
-      console.error("Error fetching driver data:", error);
+      console.error('Error fetching drivers data:', error);
+      toast({
+        title: 'Drivers fetch failed',
+        description: 'Unable to load drivers dashboard data.',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "AVAILABLE":
-        return "bg-green-100 text-green-800";
-      case "ON_TRIP":
-        return "bg-blue-100 text-blue-800";
-      case "OFF_DUTY":
-        return "bg-gray-100 text-gray-800";
-      default:
-        return "bg-gray-100 text-gray-800";
+  useEffect(() => {
+    void refreshDriverData();
+  }, []);
+
+  const summary = useMemo(() => {
+    const assigned = drivers.filter((driver) => Boolean(driver.assignedVehicle)).length;
+    const utilization = drivers.length > 0 ? Math.round((assigned / drivers.length) * 100) : 0;
+
+    return { assigned, utilization };
+  }, [drivers]);
+
+  const handleCreateDriverProfile = async () => {
+    const defaultUserId = drivers[0]?.userId || '';
+    const userId = window.prompt('Existing user ID for driver profile', defaultUserId)?.trim();
+    if (!userId) return;
+
+    const licenseNumber = window.prompt('License number', `DL-${Date.now().toString().slice(-6)}`)?.trim();
+    if (!licenseNumber) return;
+
+    const licenseType = window.prompt('License type', 'HGMV')?.trim() || 'HGMV';
+    const yearsExperienceInput = window.prompt('Years of experience', '3')?.trim();
+    const yearsExperience = yearsExperienceInput ? Number(yearsExperienceInput) : undefined;
+
+    setActionLoading('create-driver');
+
+    try {
+      const created = await upsertDriverProfile({
+        userId,
+        licenseNumber,
+        licenseType,
+        yearsExperience: Number.isFinite(yearsExperience) ? yearsExperience : undefined,
+      });
+
+      if (!created) {
+        toast({
+          title: 'Create profile failed',
+          description: 'Could not create profile. Ensure the user ID exists in backend users table.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Driver profile saved',
+        description: `Profile for ${created.user?.name || created.userId} is now available.`,
+      });
+
+      await refreshDriverData();
+    } catch (error) {
+      console.error('Error creating driver profile:', error);
+      toast({
+        title: 'Create profile failed',
+        description: 'Unexpected error while creating driver profile.',
+        variant: 'destructive',
+      });
+    } finally {
+      setActionLoading(null);
     }
   };
 
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return "text-green-600";
-    if (score >= 60) return "text-yellow-600";
-    return "text-red-600";
+  const handleAssignVehicle = async (driver: DriverProfile) => {
+    if (vehicles.length === 0) {
+      toast({
+        title: 'No vehicles available',
+        description: 'Add vehicles before assigning drivers.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const suggestions = vehicles
+      .slice(0, 5)
+      .map((vehicle) => `${vehicle.plate || vehicle.vehicleId} (${vehicle.name})`)
+      .join(', ');
+
+    const defaultVehicle = getVehicleIdentifier(vehicles[0]);
+    const vehicleId = window.prompt(
+      `Vehicle ID for ${driver.user?.name || driver.userId} (examples: ${suggestions})`,
+      defaultVehicle,
+    )?.trim();
+
+    if (!vehicleId) return;
+
+    setActionLoading(driver.id);
+
+    try {
+      const updated = await assignDriverVehicle(driver.userId, vehicleId);
+
+      if (!updated) {
+        toast({
+          title: 'Assign failed',
+          description: `Could not assign vehicle ${vehicleId} to ${driver.user?.name || driver.userId}.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Vehicle assigned',
+        description: `${updated.user?.name || updated.userId} assigned to ${updated.assignedVehicle?.vehicleNumber || vehicleId}.`,
+      });
+
+      await refreshDriverData();
+    } catch (error) {
+      console.error('Error assigning driver to vehicle:', error);
+      toast({
+        title: 'Assign failed',
+        description: 'Unexpected error while assigning vehicle.',
+        variant: 'destructive',
+      });
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   if (loading) {
     return (
-      <div className="p-8">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-32 bg-gray-200 rounded"></div>
-            ))}
-          </div>
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <p className="text-muted-foreground">Loading drivers board...</p>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="p-8 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Driver Management</h1>
-        <Button>Add Driver</Button>
-      </div>
-
-      {/* KPI Cards */}
-      {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Total Drivers</p>
-                <h3 className="text-2xl font-bold">{stats.total}</h3>
-              </div>
-              <User className="h-8 w-8 text-blue-500" />
-            </div>
-            <p className="text-xs text-gray-500 mt-2">Registered drivers</p>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Available</p>
-                <h3 className="text-2xl font-bold text-green-600">
-                  {stats.available}
-                </h3>
-              </div>
-              <MapPin className="h-8 w-8 text-green-500" />
-            </div>
-            <p className="text-xs text-gray-500 mt-2">Ready for dispatch</p>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">On Trip</p>
-                <h3 className="text-2xl font-bold text-blue-600">
-                  {stats.onTrip}
-                </h3>
-              </div>
-              <TrendingUp className="h-8 w-8 text-blue-500" />
-            </div>
-            <p className="text-xs text-gray-500 mt-2">Currently driving</p>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Avg Safety Score</p>
-                <h3 className="text-2xl font-bold text-purple-600">
-                  {stats.avgSafetyScore}
-                </h3>
-              </div>
-              <Award className="h-8 w-8 text-purple-500" />
-            </div>
-            <p className="text-xs text-gray-500 mt-2">Fleet average</p>
-          </Card>
+    <DashboardLayout>
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-heading font-bold text-foreground">Driver Management</h1>
+            <p className="text-sm text-muted-foreground">Profiles, assignment state, and operational utilization</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleCreateDriverProfile()}
+            disabled={actionLoading === 'create-driver'}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-60 text-sm"
+          >
+            <Plus className="h-4 w-4" />
+            {actionLoading === 'create-driver' ? 'Saving...' : 'Add Driver Profile'}
+          </button>
         </div>
-      )}
 
-      {/* Driver List */}
-      <Card className="p-6">
-        <h2 className="text-xl font-bold mb-4">Driver Roster</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {drivers.map((driver) => (
-            <Card key={driver.id} className="p-4 hover:shadow-md">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                    <User className="h-6 w-6 text-blue-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">{driver.user.name}</h3>
-                    <p className="text-xs text-gray-500">{driver.user.email}</p>
-                  </div>
+        {stats && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div className="glass-card p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Total Drivers</p>
+                  <p className="text-2xl font-heading font-semibold text-foreground">{stats.total}</p>
                 </div>
-                <Badge className={getStatusColor(driver.status)}>
-                  {driver.status.replace("_", " ")}
-                </Badge>
+                <Users className="h-5 w-5 text-foreground" />
               </div>
+              <p className="text-xs text-muted-foreground mt-2">Profiles in system</p>
+            </div>
 
-              <div className="space-y-2 mb-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Safety Score:</span>
-                  <span className={`font-bold ${getScoreColor(driver.safetyScore)}`}>
-                    {driver.safetyScore}/100
-                  </span>
+            <div className="glass-card p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Available Drivers</p>
+                  <p className="text-2xl font-heading font-semibold text-optimal">{stats.available}</p>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">On-Time Rate:</span>
-                  <span className="font-medium">{driver.onTimeRate}%</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Miles (Month):</span>
-                  <span className="font-medium">
-                    {driver.milesThisMonth.toFixed(0)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Experience:</span>
-                  <span className="font-medium">{driver.yearsExperience} years</span>
-                </div>
+                <UserCheck className="h-5 w-5 text-optimal" />
               </div>
+              <p className="text-xs text-muted-foreground mt-2">Ready for dispatch</p>
+            </div>
 
-              {driver.assignedVehicle ? (
-                <div className="bg-gray-50 p-2 rounded text-sm">
-                  <p className="font-medium">
-                    {driver.assignedVehicle.vehicleNumber}
-                  </p>
-                  <p className="text-xs text-gray-600">
-                    {driver.assignedVehicle.manufacturer}{" "}
-                    {driver.assignedVehicle.model}
-                  </p>
-                  {driver.assignedVehicle.fuelLevel !== null && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Fuel: {driver.assignedVehicle.fuelLevel}%
-                    </p>
-                  )}
+            <div className="glass-card p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">On Trip</p>
+                  <p className="text-2xl font-heading font-semibold text-anomaly">{stats.onTrip}</p>
                 </div>
-              ) : (
-                <div className="bg-yellow-50 p-2 rounded text-sm text-center">
-                  <p className="text-yellow-700">No vehicle assigned</p>
-                </div>
-              )}
-
-              <div className="mt-3 flex gap-2">
-                <Button variant="outline" size="sm" className="flex-1">
-                  View Profile
-                </Button>
-                <Button variant="outline" size="sm" className="flex-1">
-                  Assign Vehicle
-                </Button>
+                <Car className="h-5 w-5 text-anomaly" />
               </div>
-            </Card>
-          ))}
+              <p className="text-xs text-muted-foreground mt-2">Currently in transit</p>
+            </div>
+
+            <div className="glass-card p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Avg Safety Score</p>
+                  <p className="text-2xl font-heading font-semibold text-warning">{stats.avgSafetyScore}</p>
+                </div>
+                <Shield className="h-5 w-5 text-warning" />
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">Fleet safety baseline</p>
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="glass-card p-4">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">Off Duty</p>
+            <p className="text-2xl font-heading font-semibold text-warning">{stats?.offDuty ?? 0}</p>
+          </div>
+          <div className="glass-card p-4">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">Assigned</p>
+            <p className="text-2xl font-heading font-semibold text-anomaly">{summary.assigned}</p>
+          </div>
+          <div className="glass-card p-4">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">Utilization</p>
+            <p className="text-2xl font-heading font-semibold text-foreground">{summary.utilization}%</p>
+          </div>
         </div>
-      </Card>
-    </div>
+
+        <div className="glass-card overflow-hidden">
+          <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+            <h2 className="font-heading font-semibold text-foreground">Driver Directory</h2>
+            <span className="text-sm text-muted-foreground">{drivers.length} records</span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-secondary/30">
+                  <th className="px-5 py-3 text-left text-xs uppercase tracking-wide text-muted-foreground">Driver</th>
+                  <th className="px-5 py-3 text-left text-xs uppercase tracking-wide text-muted-foreground">Contact</th>
+                  <th className="px-5 py-3 text-left text-xs uppercase tracking-wide text-muted-foreground">License</th>
+                  <th className="px-5 py-3 text-left text-xs uppercase tracking-wide text-muted-foreground">Assigned Vehicle</th>
+                  <th className="px-5 py-3 text-left text-xs uppercase tracking-wide text-muted-foreground">Status</th>
+                  <th className="px-5 py-3 text-left text-xs uppercase tracking-wide text-muted-foreground">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {drivers.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-5 py-8 text-center text-muted-foreground">
+                      No drivers found.
+                    </td>
+                  </tr>
+                )}
+
+                {drivers.map((driver) => (
+                  <tr key={driver.id} className="border-b border-border/70 last:border-b-0 hover:bg-secondary/20">
+                    <td className="px-5 py-4">
+                      <div>
+                        <p className="font-medium text-foreground">{driver.user?.name || driver.userId}</p>
+                        <p className="text-xs text-muted-foreground">User ID: {driver.userId}</p>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="space-y-1 text-xs text-muted-foreground">
+                        <p className="flex items-center gap-1">
+                          <Phone className="h-3 w-3" />
+                          {safeLabel(driver.user?.phone)}
+                        </p>
+                        <p className="flex items-center gap-1">
+                          <Mail className="h-3 w-3" />
+                          {safeLabel(driver.user?.email)}
+                        </p>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 text-xs text-foreground">{safeLabel(driver.licenseNumber)}</td>
+                    <td className="px-5 py-4">
+                      <p className="text-xs text-foreground">
+                        {driver.assignedVehicle
+                          ? driver.assignedVehicle.vehicleNumber || safeLabel(driver.assignedVehicle.model)
+                          : '--'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {driver.assignedVehicle
+                          ? `${safeLabel(driver.assignedVehicle.manufacturer)} ${safeLabel(driver.assignedVehicle.model)}`
+                          : 'No active assignment'}
+                      </p>
+                    </td>
+                    <td className="px-5 py-4">
+                      <span className={`text-[11px] px-2 py-0.5 rounded border ${getStatusClasses(driver.status)}`}>
+                        {driver.status}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void handleAssignVehicle(driver)}
+                          disabled={actionLoading === driver.id}
+                          className="px-3 py-1.5 rounded border border-border text-xs text-foreground hover:bg-secondary disabled:opacity-60"
+                        >
+                          {actionLoading === driver.id ? 'Assigning...' : 'Assign Vehicle'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            toast({
+                              title: 'Driver profile',
+                              description: `${driver.user?.name || driver.userId} | License: ${safeLabel(driver.licenseNumber)}`,
+                            });
+                          }}
+                          className="px-3 py-1.5 rounded border border-border text-xs text-foreground hover:bg-secondary"
+                        >
+                          View
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </motion.div>
+    </DashboardLayout>
   );
 }

@@ -466,6 +466,426 @@ export async function fetchHealthEvaluation(
   }
 }
 
+// Fleet Management Types
+
+export interface InsuranceStats {
+  totalVehicles: number;
+  vehiclesWithInsurance: number;
+  coveragePercentage: number;
+  expiringWithin7Days: number;
+  expiredPolicies: number;
+  uninsuredCount: number;
+  totalExpiredOrUninsured?: number;
+}
+
+export interface InsurancePolicy {
+  id: string;
+  vehicleId: string;
+  provider: string;
+  policyNumber: string;
+  startDate?: string | null;
+  expiryDate: string;
+  documentUrl?: string | null;
+  daysRemaining?: number;
+  urgencyLevel?: 'expired' | 'critical' | 'warning';
+  isExpired?: boolean;
+  vehicle?: {
+    vehicleId?: string;
+    vehicleNumber?: string;
+    manufacturer?: string;
+    model?: string;
+    year?: number;
+    status?: string;
+  };
+}
+
+export interface DispatchStats {
+  pending: number;
+  active: number;
+  highPriority: number;
+  completed: number;
+  rejected?: number;
+  total?: number;
+}
+
+export interface DispatchRequest {
+  id: string;
+  ticketNumber: string;
+  origin: string;
+  destination: string;
+  cargoType?: string | null;
+  cargoWeight?: string | null;
+  priority: 'STANDARD' | 'HIGH';
+  status: 'PENDING' | 'ACTIVE' | 'COMPLETED' | 'REJECTED';
+  progressPct: number;
+  createdAt: string;
+  updatedAt?: string;
+  driverId?: string | null;
+  vehicleId?: string | null;
+  driver?: {
+    userId?: string;
+    name?: string;
+    email?: string;
+    phone?: string;
+  } | null;
+  vehicle?: {
+    vehicleId?: string;
+    vehicleNumber?: string;
+    manufacturer?: string;
+    model?: string;
+    year?: number;
+    fuelLevel?: number | null;
+    currentLocation?: string | null;
+  } | null;
+  driverLocations?: Array<{
+    latitude: number;
+    longitude: number;
+    speed?: number | null;
+    timestamp: string;
+  }>;
+}
+
+export interface MaintenanceStats {
+  vehiclesInMaintenance: number;
+  activeOrders: number;
+  completedThisMonth: number;
+  totalCostThisMonth: number;
+  overdueOrders: number;
+  highPriorityPending?: number;
+  avgDowntimeDays: number;
+}
+
+export interface MaintenanceOrder {
+  id: string;
+  vehicleId: string;
+  title: string;
+  description?: string | null;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH';
+  status: 'SCHEDULED' | 'IN_SERVICE' | 'AWAITING_PARTS' | 'READY' | 'COMPLETED';
+  orderType: 'CORRECTIVE' | 'PROACTIVE';
+  mechanicName?: string | null;
+  scheduledDate?: string | null;
+  completedDate?: string | null;
+  estimatedCost?: number | null;
+  actualCost?: number | null;
+  vehicle: {
+    vehicleId?: string;
+    vehicleNumber?: string;
+    manufacturer?: string;
+    model?: string;
+    year?: number;
+    status?: string;
+  };
+}
+
+export interface DriverStats {
+  total: number;
+  available: number;
+  onTrip: number;
+  offDuty: number;
+  avgSafetyScore: number;
+}
+
+export interface DriverProfile {
+  id: string;
+  userId: string;
+  licenseNumber?: string;
+  licenseType?: string;
+  safetyScore: number;
+  milesThisMonth: number;
+  totalIncidents: number;
+  onTimeRate: number;
+  yearsExperience: number;
+  status: 'AVAILABLE' | 'ON_TRIP' | 'OFF_DUTY';
+  licenseExpiry?: string | null;
+  user: {
+    userId?: string;
+    name?: string;
+    email?: string;
+    phone?: string | null;
+    fleetRole?: string;
+    isActive?: boolean;
+    isApproved?: boolean;
+  };
+  assignedVehicle?: {
+    vehicleId?: string;
+    vehicleNumber?: string;
+    manufacturer?: string;
+    model?: string;
+    status?: string;
+    fuelLevel?: number | null;
+  } | null;
+}
+
+interface ApiEnvelope<T> {
+  success?: boolean;
+  data?: T;
+  message?: string;
+}
+
+const getEnvelopeData = <T>(responseData: ApiEnvelope<T> | T | undefined, fallback: T): T => {
+  if (!responseData) return fallback;
+  if (typeof responseData === 'object' && responseData !== null && 'data' in responseData) {
+    const envelope = responseData as ApiEnvelope<T>;
+    return envelope.data ?? fallback;
+  }
+  return responseData as T;
+};
+
+// Fleet Management API
+
+export async function fetchInsuranceStats(): Promise<InsuranceStats | null> {
+  try {
+    const response = await api.get('/insurance/stats');
+    return getEnvelopeData<InsuranceStats | null>(response.data, null);
+  } catch (error) {
+    console.error('Error fetching insurance stats:', error);
+    return null;
+  }
+}
+
+export async function fetchUrgentPolicies(): Promise<InsurancePolicy[]> {
+  try {
+    const response = await api.get('/insurance/urgent');
+    return getEnvelopeData<InsurancePolicy[]>(response.data, []);
+  } catch (error) {
+    console.error('Error fetching urgent insurance policies:', error);
+    return [];
+  }
+}
+
+export async function fetchUpcomingRenewals(): Promise<InsurancePolicy[]> {
+  try {
+    const response = await api.get('/insurance/upcoming');
+    return getEnvelopeData<InsurancePolicy[]>(response.data, []);
+  } catch (error) {
+    console.error('Error fetching upcoming renewals:', error);
+    return [];
+  }
+}
+
+export async function addInsurancePolicy(payload: {
+  vehicleId: string;
+  provider: string;
+  policyNumber: string;
+  startDate?: string;
+  expiryDate: string;
+}): Promise<InsurancePolicy | null> {
+  try {
+    const response = await api.post('/insurance', payload);
+    return getEnvelopeData<InsurancePolicy | null>(response.data, null);
+  } catch (error) {
+    console.error('Error adding insurance policy:', error);
+    return null;
+  }
+}
+
+export async function renewInsurancePolicy(
+  policyId: string,
+  payload: { startDate?: string; expiryDate: string; provider?: string; policyNumber?: string }
+): Promise<InsurancePolicy | null> {
+  try {
+    const response = await api.put(`/insurance/${policyId}`, payload);
+    return getEnvelopeData<InsurancePolicy | null>(response.data, null);
+  } catch (error) {
+    console.error(`Error renewing insurance policy ${policyId}:`, error);
+    return null;
+  }
+}
+
+export async function fetchDispatchStats(): Promise<DispatchStats | null> {
+  try {
+    const response = await api.get('/dispatch/stats');
+    return getEnvelopeData<DispatchStats | null>(response.data, null);
+  } catch (error) {
+    console.error('Error fetching dispatch stats:', error);
+    return null;
+  }
+}
+
+export async function fetchPendingDispatchRequests(): Promise<DispatchRequest[]> {
+  try {
+    const response = await api.get('/dispatch/pending');
+    return getEnvelopeData<DispatchRequest[]>(response.data, []);
+  } catch (error) {
+    console.error('Error fetching pending dispatch requests:', error);
+    return [];
+  }
+}
+
+export async function fetchActiveDispatchTrips(): Promise<DispatchRequest[]> {
+  try {
+    const response = await api.get('/dispatch/active');
+    return getEnvelopeData<DispatchRequest[]>(response.data, []);
+  } catch (error) {
+    console.error('Error fetching active dispatch trips:', error);
+    return [];
+  }
+}
+
+export async function fetchDispatchHistory(): Promise<DispatchRequest[]> {
+  try {
+    const response = await api.get('/dispatch/history');
+    return getEnvelopeData<DispatchRequest[]>(response.data, []);
+  } catch (error) {
+    console.error('Error fetching dispatch history:', error);
+    return [];
+  }
+}
+
+export async function createDispatchRequest(payload: {
+  origin: string;
+  destination: string;
+  cargoType?: string;
+  cargoWeight?: string;
+  priority?: 'STANDARD' | 'HIGH';
+  driverId?: string;
+  vehicleId?: string;
+}): Promise<DispatchRequest | null> {
+  try {
+    const response = await api.post('/dispatch', payload);
+    return getEnvelopeData<DispatchRequest | null>(response.data, null);
+  } catch (error) {
+    console.error('Error creating dispatch request:', error);
+    return null;
+  }
+}
+
+export async function approveDispatchRequest(
+  requestId: string,
+  payload: { driverId?: string; vehicleId?: string } = {}
+): Promise<DispatchRequest | null> {
+  try {
+    const response = await api.put(`/dispatch/${requestId}/approve`, payload);
+    return getEnvelopeData<DispatchRequest | null>(response.data, null);
+  } catch (error) {
+    console.error(`Error approving dispatch request ${requestId}:`, error);
+    return null;
+  }
+}
+
+export async function rejectDispatchRequest(requestId: string): Promise<boolean> {
+  try {
+    await api.delete(`/dispatch/${requestId}/reject`);
+    return true;
+  } catch (error) {
+    console.error(`Error rejecting dispatch request ${requestId}:`, error);
+    return false;
+  }
+}
+
+export async function completeDispatchTrip(requestId: string): Promise<DispatchRequest | null> {
+  try {
+    const response = await api.put(`/dispatch/${requestId}/complete`);
+    return getEnvelopeData<DispatchRequest | null>(response.data, null);
+  } catch (error) {
+    console.error(`Error completing dispatch trip ${requestId}:`, error);
+    return null;
+  }
+}
+
+export async function fetchMaintenanceStats(): Promise<MaintenanceStats | null> {
+  try {
+    const response = await api.get('/maintenance/stats');
+    return getEnvelopeData<MaintenanceStats | null>(response.data, null);
+  } catch (error) {
+    console.error('Error fetching maintenance stats:', error);
+    return null;
+  }
+}
+
+export async function fetchMaintenanceOrders(): Promise<MaintenanceOrder[]> {
+  try {
+    const response = await api.get('/maintenance');
+    return getEnvelopeData<MaintenanceOrder[]>(response.data, []);
+  } catch (error) {
+    console.error('Error fetching maintenance orders:', error);
+    return [];
+  }
+}
+
+export async function createMaintenanceOrder(payload: {
+  vehicleId: string;
+  title: string;
+  description?: string;
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH';
+  orderType?: 'CORRECTIVE' | 'PROACTIVE';
+  mechanicName?: string;
+  scheduledDate?: string;
+  estimatedCost?: number;
+}): Promise<MaintenanceOrder | null> {
+  try {
+    const response = await api.post('/maintenance', payload);
+    return getEnvelopeData<MaintenanceOrder | null>(response.data, null);
+  } catch (error) {
+    console.error('Error creating maintenance order:', error);
+    return null;
+  }
+}
+
+export async function updateMaintenanceOrderStatus(
+  orderId: string,
+  status: MaintenanceOrder['status']
+): Promise<MaintenanceOrder | null> {
+  try {
+    const response = await api.patch(`/maintenance/${orderId}/status`, { status });
+    return getEnvelopeData<MaintenanceOrder | null>(response.data, null);
+  } catch (error) {
+    console.error(`Error updating maintenance order ${orderId}:`, error);
+    return null;
+  }
+}
+
+export async function fetchDriverStats(): Promise<DriverStats | null> {
+  try {
+    const response = await api.get('/drivers/stats');
+    return getEnvelopeData<DriverStats | null>(response.data, null);
+  } catch (error) {
+    console.error('Error fetching driver stats:', error);
+    return null;
+  }
+}
+
+export async function fetchDrivers(): Promise<DriverProfile[]> {
+  try {
+    const response = await api.get('/drivers');
+    return getEnvelopeData<DriverProfile[]>(response.data, []);
+  } catch (error) {
+    console.error('Error fetching drivers:', error);
+    return [];
+  }
+}
+
+export async function assignDriverVehicle(
+  userId: string,
+  vehicleId: string | null
+): Promise<DriverProfile | null> {
+  try {
+    const response = await api.put(`/drivers/${userId}/vehicle`, { vehicleId });
+    return getEnvelopeData<DriverProfile | null>(response.data, null);
+  } catch (error) {
+    console.error(`Error assigning vehicle for driver ${userId}:`, error);
+    return null;
+  }
+}
+
+export async function upsertDriverProfile(payload: {
+  userId: string;
+  licenseNumber?: string;
+  licenseType?: string;
+  yearsExperience?: number;
+  safetyScore?: number;
+  onTimeRate?: number;
+}): Promise<DriverProfile | null> {
+  try {
+    const response = await api.post('/drivers', payload);
+    return getEnvelopeData<DriverProfile | null>(response.data, null);
+  } catch (error) {
+    console.error('Error creating/updating driver profile:', error);
+    return null;
+  }
+}
+
 // Helper functions
 
 function normalizeSeverity(severity: string): 'critical' | 'warning' | 'anomaly' {

@@ -1,250 +1,371 @@
-import { useState, useEffect } from "react";
-import { AlertCircle, CheckCircle, Clock, TrendingUp } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { useEffect, useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
+import { AlertCircle, CalendarClock, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { DashboardLayout } from '@/components/DashboardLayout';
+import { toast } from '@/components/ui/use-toast';
+import {
+  addInsurancePolicy,
+  fetchInsuranceStats,
+  fetchUpcomingRenewals,
+  fetchUrgentPolicies,
+  fetchVehicles,
+  renewInsurancePolicy,
+} from '@/services/api';
+import type { InsurancePolicy, InsuranceStats, Vehicle } from '@/services/api';
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+const getVehicleIdentifier = (vehicle: Vehicle): string => vehicle.vehicleId || vehicle.id;
 
-interface InsuranceStats {
-  totalVehicles: number;
-  vehiclesWithInsurance: number;
-  coveragePercentage: number;
-  expiringWithin7Days: number;
-  expiredPolicies: number;
-  uninsuredCount: number;
-}
+const toDateLabel = (dateValue?: string | null): string => {
+  if (!dateValue) return '--';
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return '--';
+  return date.toLocaleDateString();
+};
 
-interface InsurancePolicy {
-  id: string;
-  vehicleId: string;
-  provider: string;
-  policyNumber: string;
-  expiryDate: string;
-  daysRemaining?: number;
-  urgencyLevel?: string;
-  vehicle: {
-    vehicleNumber: string;
-    manufacturer: string;
-    model: string;
-    year: number;
-  };
-}
+const getUrgencyClasses = (urgencyLevel?: string): string => {
+  if (urgencyLevel === 'expired') return 'status-critical';
+  if (urgencyLevel === 'critical') return 'status-warning';
+  if (urgencyLevel === 'warning') return 'status-anomaly';
+  return 'bg-secondary text-secondary-foreground border-border';
+};
 
 export default function InsurancePage() {
   const [stats, setStats] = useState<InsuranceStats | null>(null);
   const [urgentPolicies, setUrgentPolicies] = useState<InsurancePolicy[]>([]);
   const [upcomingRenewals, setUpcomingRenewals] = useState<InsurancePolicy[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchInsuranceData();
-  }, []);
-
-  const fetchInsuranceData = async () => {
+  const refreshInsuranceData = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const [statsRes, urgentRes, upcomingRes] = await Promise.all([
-        fetch(`${API_BASE}/insurance/stats`),
-        fetch(`${API_BASE}/insurance/urgent`),
-        fetch(`${API_BASE}/insurance/upcoming`),
+      const [statsData, urgentData, upcomingData, vehiclesData] = await Promise.all([
+        fetchInsuranceStats(),
+        fetchUrgentPolicies(),
+        fetchUpcomingRenewals(),
+        fetchVehicles(),
       ]);
 
-      const statsData = await statsRes.json();
-      const urgentData = await urgentRes.json();
-      const upcomingData = await upcomingRes.json();
-
-      if (statsData.success) setStats(statsData.data);
-      if (urgentData.success) setUrgentPolicies(urgentData.data);
-      if (upcomingData.success) setUpcomingRenewals(upcomingData.data);
+      setStats(statsData);
+      setUrgentPolicies(urgentData);
+      setUpcomingRenewals(upcomingData);
+      setVehicles(vehiclesData);
     } catch (error) {
-      console.error("Error fetching insurance data:", error);
+      console.error('Error fetching insurance data:', error);
+      toast({
+        title: 'Insurance fetch failed',
+        description: 'Unable to load insurance data. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const getUrgencyColor = (urgencyLevel?: string) => {
-    switch (urgencyLevel) {
-      case "expired":
-        return "bg-red-500 text-white";
-      case "critical":
-        return "bg-orange-500 text-white";
-      case "warning":
-        return "bg-yellow-500 text-black";
-      default:
-        return "bg-gray-500 text-white";
+  useEffect(() => {
+    void refreshInsuranceData();
+  }, []);
+
+  const vehicleHints = useMemo(() => {
+    return vehicles
+      .slice(0, 5)
+      .map((vehicle) => `${vehicle.plate || vehicle.vehicleId} (${vehicle.name})`)
+      .join(', ');
+  }, [vehicles]);
+
+  const handleAddPolicy = async () => {
+    if (vehicles.length === 0) {
+      toast({
+        title: 'No vehicles available',
+        description: 'Create a vehicle first, then add an insurance policy.',
+        variant: 'destructive',
+      });
+      return;
     }
+
+    const defaultVehicleId = getVehicleIdentifier(vehicles[0]);
+    const vehicleId = window.prompt(
+      `Vehicle ID (examples: ${vehicleHints || defaultVehicleId})`,
+      defaultVehicleId
+    )?.trim();
+
+    if (!vehicleId) return;
+
+    const provider = window.prompt('Insurance provider', 'HDFC ERGO')?.trim();
+    if (!provider) return;
+
+    const policyNumber = window.prompt('Policy number', `AUTO-${Date.now()}`)?.trim();
+    if (!policyNumber) return;
+
+    const expiryDate = window.prompt('Expiry date (YYYY-MM-DD)', '2027-12-31')?.trim();
+    if (!expiryDate) return;
+
+    setActionLoading('add-policy');
+
+    try {
+      const created = await addInsurancePolicy({
+        vehicleId,
+        provider,
+        policyNumber,
+        expiryDate,
+        startDate: new Date().toISOString().slice(0, 10),
+      });
+
+      if (!created) {
+        toast({
+          title: 'Add policy failed',
+          description: 'Check vehicle ID and retry.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Policy added',
+        description: `${created.policyNumber} has been added successfully.`,
+      });
+
+      await refreshInsuranceData();
+    } catch (error) {
+      console.error('Error adding policy:', error);
+      toast({
+        title: 'Add policy failed',
+        description: 'Unexpected error while adding policy.',
+        variant: 'destructive',
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRenewPolicy = async (policy: InsurancePolicy) => {
+    const existingExpiry = new Date(policy.expiryDate);
+    const baseDate = Number.isNaN(existingExpiry.getTime()) ? new Date() : existingExpiry;
+    const renewedDate = new Date(baseDate);
+    renewedDate.setFullYear(baseDate.getFullYear() + 1);
+
+    const nextExpiry = window
+      .prompt('Renew until date (YYYY-MM-DD)', renewedDate.toISOString().slice(0, 10))
+      ?.trim();
+
+    if (!nextExpiry) return;
+
+    setActionLoading(policy.id);
+
+    try {
+      const renewed = await renewInsurancePolicy(policy.id, { expiryDate: nextExpiry });
+
+      if (!renewed) {
+        toast({
+          title: 'Renewal failed',
+          description: `Could not renew ${policy.policyNumber}.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Policy renewed',
+        description: `${policy.policyNumber} renewed to ${toDateLabel(nextExpiry)}.`,
+      });
+
+      await refreshInsuranceData();
+    } catch (error) {
+      console.error('Error renewing policy:', error);
+      toast({
+        title: 'Renewal failed',
+        description: 'Unexpected error while renewing policy.',
+        variant: 'destructive',
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleViewPolicy = (policy: InsurancePolicy) => {
+    const vehicleLabel = `${policy.vehicle?.manufacturer || 'Unknown'} ${policy.vehicle?.model || ''}`.trim();
+    const urgency = policy.urgencyLevel || 'active';
+
+    toast({
+      title: `${policy.policyNumber}`,
+      description: `${vehicleLabel} • ${policy.provider} • Expires ${toDateLabel(policy.expiryDate)} • ${urgency.toUpperCase()}`,
+    });
   };
 
   if (loading) {
     return (
-      <div className="p-8">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-32 bg-gray-200 rounded"></div>
-            ))}
-          </div>
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <p className="text-muted-foreground">Loading insurance dashboard...</p>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="p-8 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Insurance Management</h1>
-        <Button>Add Policy</Button>
-      </div>
-
-      {/* KPI Cards */}
-      {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Coverage</p>
-                <h3 className="text-2xl font-bold">{stats.coveragePercentage}%</h3>
-              </div>
-              <CheckCircle className="h-8 w-8 text-green-500" />
-            </div>
-            <p className="text-xs text-gray-500 mt-2">
-              {stats.vehiclesWithInsurance} of {stats.totalVehicles} vehicles
-            </p>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Expiring Soon</p>
-                <h3 className="text-2xl font-bold text-orange-600">
-                  {stats.expiringWithin7Days}
-                </h3>
-              </div>
-              <AlertCircle className="h-8 w-8 text-orange-500" />
-            </div>
-            <p className="text-xs text-gray-500 mt-2">Within 7 days</p>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Expired</p>
-                <h3 className="text-2xl font-bold text-red-600">
-                  {stats.expiredPolicies}
-                </h3>
-              </div>
-              <Clock className="h-8 w-8 text-red-500" />
-            </div>
-            <p className="text-xs text-gray-500 mt-2">Requires renewal</p>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Uninsured</p>
-                <h3 className="text-2xl font-bold text-red-600">
-                  {stats.uninsuredCount}
-                </h3>
-              </div>
-              <TrendingUp className="h-8 w-8 text-red-500" />
-            </div>
-            <p className="text-xs text-gray-500 mt-2">No active policy</p>
-          </Card>
+    <DashboardLayout>
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-heading font-bold text-foreground">Insurance Management</h1>
+            <p className="text-sm text-muted-foreground">Coverage, renewals, and urgent policy actions</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleAddPolicy()}
+            disabled={actionLoading === 'add-policy'}
+            className="px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-60 text-sm"
+          >
+            {actionLoading === 'add-policy' ? 'Adding...' : 'Add Policy'}
+          </button>
         </div>
-      )}
 
-      {/* Urgent Policies */}
-      {urgentPolicies.length > 0 && (
-        <Card className="p-6">
-          <h2 className="text-xl font-bold mb-4 text-red-600">
-            Urgent Actions Required ({urgentPolicies.length})
-          </h2>
-          <div className="space-y-3">
-            {urgentPolicies.map((policy) => (
-              <div
-                key={policy.id}
-                className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
-              >
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold">
-                      {policy.vehicle.manufacturer} {policy.vehicle.model}
-                    </h3>
-                    <Badge className={getUrgencyColor(policy.urgencyLevel)}>
-                      {policy.urgencyLevel === "expired"
-                        ? "EXPIRED"
-                        : `${policy.daysRemaining} days left`}
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-gray-600">
-                    {policy.vehicle.vehicleNumber} • {policy.provider} •{" "}
-                    {policy.policyNumber}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Expiry: {new Date(policy.expiryDate).toLocaleDateString()}
-                  </p>
+        {stats && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div className="glass-card p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Coverage</p>
+                  <p className="text-2xl font-heading font-semibold text-foreground">{stats.coveragePercentage}%</p>
                 </div>
-                <Button variant="outline" size="sm">
-                  Renew
-                </Button>
+                <ShieldCheck className="h-5 w-5 text-success" />
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                {stats.vehiclesWithInsurance} / {stats.totalVehicles} vehicles insured
+              </p>
+            </div>
+
+            <div className="glass-card p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Expiring 7 Days</p>
+                  <p className="text-2xl font-heading font-semibold text-warning">{stats.expiringWithin7Days}</p>
+                </div>
+                <CalendarClock className="h-5 w-5 text-warning" />
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">Immediate renewal queue</p>
+            </div>
+
+            <div className="glass-card p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Expired</p>
+                  <p className="text-2xl font-heading font-semibold text-destructive">{stats.expiredPolicies}</p>
+                </div>
+                <AlertCircle className="h-5 w-5 text-destructive" />
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">Critical compliance risk</p>
+            </div>
+
+            <div className="glass-card p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Uninsured</p>
+                  <p className="text-2xl font-heading font-semibold text-destructive">{stats.uninsuredCount}</p>
+                </div>
+                <CheckCircle2 className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">Vehicles with no policy</p>
+            </div>
+          </div>
+        )}
+
+        <div className="glass-card p-5">
+          <h2 className="text-lg font-heading font-semibold text-foreground mb-3">
+            Urgent Actions ({urgentPolicies.length})
+          </h2>
+
+          <div className="space-y-3">
+            {urgentPolicies.length === 0 && (
+              <div className="text-sm text-muted-foreground">No urgent policies. Great job keeping renewals on track.</div>
+            )}
+
+            {urgentPolicies.map((policy) => (
+              <div key={policy.id} className="border border-border rounded-md px-4 py-3 bg-card/60">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm font-semibold text-foreground">
+                        {policy.vehicle?.manufacturer} {policy.vehicle?.model}
+                      </span>
+                      <span className={`text-[11px] px-2 py-0.5 rounded border ${getUrgencyClasses(policy.urgencyLevel)}`}>
+                        {policy.urgencyLevel === 'expired'
+                          ? 'EXPIRED'
+                          : `${policy.daysRemaining ?? '--'} days left`}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {policy.vehicle?.vehicleNumber} • {policy.provider} • {policy.policyNumber}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">Expiry: {toDateLabel(policy.expiryDate)}</p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleViewPolicy(policy)}
+                      className="px-3 py-1.5 rounded border border-border text-xs text-foreground hover:bg-secondary"
+                    >
+                      View
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleRenewPolicy(policy)}
+                      disabled={actionLoading === policy.id}
+                      className="px-3 py-1.5 rounded bg-primary text-primary-foreground text-xs hover:bg-primary/90 disabled:opacity-60"
+                    >
+                      {actionLoading === policy.id ? 'Renewing...' : 'Renew'}
+                    </button>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
-        </Card>
-      )}
-
-      {/* Upcoming Renewals */}
-      <Card className="p-6">
-        <h2 className="text-xl font-bold mb-4">
-          Upcoming Renewals (Next 30 Days) - {upcomingRenewals.length}
-        </h2>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Vehicle</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Provider</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">
-                  Policy Number
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">
-                  Expiry Date
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {upcomingRenewals.map((policy) => (
-                <tr key={policy.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    <div>
-                      <div className="font-medium">
-                        {policy.vehicle.manufacturer} {policy.vehicle.model}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {policy.vehicle.vehicleNumber}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">{policy.provider}</td>
-                  <td className="px-4 py-3">{policy.policyNumber}</td>
-                  <td className="px-4 py-3">
-                    {new Date(policy.expiryDate).toLocaleDateString()}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Button variant="outline" size="sm">
-                      View
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
-      </Card>
-    </div>
+
+        <div className="glass-card p-5">
+          <h2 className="text-lg font-heading font-semibold text-foreground mb-3">
+            Upcoming Renewals (30 Days) - {upcomingRenewals.length}
+          </h2>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left border-b border-border text-muted-foreground">
+                  <th className="py-2 pr-3">Vehicle</th>
+                  <th className="py-2 pr-3">Provider</th>
+                  <th className="py-2 pr-3">Policy</th>
+                  <th className="py-2 pr-3">Expiry</th>
+                  <th className="py-2">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {upcomingRenewals.map((policy) => (
+                  <tr key={policy.id} className="border-b border-border/60 last:border-b-0">
+                    <td className="py-3 pr-3 text-foreground">
+                      {(policy.vehicle?.manufacturer || '--') + ' ' + (policy.vehicle?.model || '')}
+                      <div className="text-xs text-muted-foreground">{policy.vehicle?.vehicleNumber || '--'}</div>
+                    </td>
+                    <td className="py-3 pr-3 text-foreground">{policy.provider}</td>
+                    <td className="py-3 pr-3 text-foreground">{policy.policyNumber}</td>
+                    <td className="py-3 pr-3 text-foreground">{toDateLabel(policy.expiryDate)}</td>
+                    <td className="py-3">
+                      <button
+                        type="button"
+                        onClick={() => handleViewPolicy(policy)}
+                        className="px-3 py-1.5 rounded border border-border text-xs text-foreground hover:bg-secondary"
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </motion.div>
+    </DashboardLayout>
   );
 }
