@@ -28,7 +28,7 @@ export interface Vehicle {
   year?: number;
   vin?: string;
   fuelType?: string;
-  latestTelemetry?: any;
+  latestTelemetry?: TelemetryPoint | null;
 }
 
 export interface Alert {
@@ -47,18 +47,54 @@ export interface Alert {
 }
 
 export interface TelemetryPoint {
+  id?: string;
+  vehicleId?: string;
+  source?: string | null;
+
   time: string;
-  engineTemp?: number;
-  batteryVoltage?: number;
-  speed?: number;
-  fuelEfficiency?: number;
-  vibration?: number;
-  vibrationLevel?: number;
-  engineRpm?: number;
-  rpm?: number;
-  coolantTemp?: number;
-  lubOilPressure?: number;
+
+  // Engine metrics
+  engineRpm?: number | null;
+  rpm?: number | null;
+  engineLoad?: number | null;
+  throttlePosition?: number | null;
+  engineTemp?: number | null;
+
+  // Oil system
+  lubOilPressure?: number | null;
+  oilPressure?: number | null;
+  lubOilTemp?: number | null;
+
+  // Cooling system
+  coolantTemp?: number | null;
+  coolantPressure?: number | null;
+  coolantLevel?: number | null;
+
+  // Fuel system
+  fuelPressure?: number | null;
+  batteryVoltage?: number | null;
+  speed?: number | null;
+  fuelEfficiency?: number | null;
+
+  // Vehicle movement / health
+  mileage?: number | null;
+  vibration?: number | null;
+  vibrationLevel?: number | null;
+
+  // Environment / diagnostics
+  ambientTemperature?: number | null;
+  errorCodesCount?: number | null;
+  activeFaultCodes?: unknown;
+
+  // EV metrics
+  batteryStateOfCharge?: number | null;
+  batteryTemp?: number | null;
+  motorTemp?: number | null;
+  inverterTemp?: number | null;
+
   recordedAt?: string;
+  receivedAt?: string;
+  rawPayload?: unknown;
 }
 
 export interface FaultLog {
@@ -77,12 +113,130 @@ export interface InsightsData {
   topAlertVehicles: Array<{ vehicle: string; alerts: number }>;
 }
 
+export interface HealthEvaluation {
+  predictionId: string;
+  vehicleId: string;
+  vehicleName: string;
+  vehiclePlate?: string;
+  telemetryId?: string;
+  overallHealth: number;
+  status: 'HEALTHY' | 'WARNING' | 'CRITICAL';
+  riskLevel: 'LOW' | 'MODERATE' | 'HIGH' | 'SEVERE';
+  failureProbability: number;
+  confidenceScore: number;
+  predictedFailureDays: number;
+  modelVersion: string;
+  diagnosticAnalysis?: string;
+  topInfluentialFeatures?: string[];
+  components?: {
+    engine: number;
+    transmission: number;
+    battery: number;
+    cooling: number;
+    suspension: number;
+    [key: string]: number;
+  };
+  recommendations?: string[];
+  source?: string | null;
+  telemetryRecordedAt?: string | null;
+  evaluatedAt: string;
+  alert?: {
+    alertId?: string;
+    alertType?: string;
+    severity?: string;
+    title?: string;
+    message?: string;
+  } | null;
+}
+
+const toTimeLabel = (value?: string, includeSeconds = false): string => {
+  if (!value) return '--:--';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '--:--';
+
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+
+  if (!includeSeconds) {
+    return `${hours}:${minutes}`;
+  }
+
+  const seconds = date.getSeconds().toString().padStart(2, '0');
+  return `${hours}:${minutes}:${seconds}`;
+};
+
+const toTelemetryPoint = (
+  point: any,
+  includeSeconds = false
+): TelemetryPoint => {
+  const speedValue =
+    point.speed !== undefined && point.speed !== null
+      ? Number(point.speed)
+      : point.rpm !== undefined && point.rpm !== null
+      ? Number(point.rpm) / 100
+      : null;
+
+  return {
+    id: point.id,
+    vehicleId: point.vehicleId,
+    source: point.source ?? null,
+
+    time: toTimeLabel(point.recordedAt, includeSeconds),
+
+    engineRpm: point.engineRpm ?? null,
+    rpm: point.rpm ?? null,
+    engineLoad: point.engineLoad ?? null,
+    throttlePosition: point.throttlePosition ?? null,
+    engineTemp: point.engineTemp ?? point.lubOilTemp ?? null,
+
+    lubOilPressure: point.lubOilPressure ?? null,
+    oilPressure: point.oilPressure ?? null,
+    lubOilTemp: point.lubOilTemp ?? null,
+
+    coolantTemp: point.coolantTemp ?? null,
+    coolantPressure: point.coolantPressure ?? null,
+    coolantLevel: point.coolantLevel ?? null,
+
+    fuelPressure: point.fuelPressure ?? null,
+    fuelEfficiency: point.fuelEfficiency ?? null,
+
+    batteryVoltage: point.batteryVoltage ?? null,
+
+    speed: Number.isFinite(speedValue) ? speedValue : null,
+    mileage: point.mileage ?? null,
+
+    vibration: point.vibrationLevel ?? null,
+    vibrationLevel: point.vibrationLevel ?? null,
+
+    ambientTemperature: point.ambientTemperature ?? null,
+    errorCodesCount: point.errorCodesCount ?? null,
+    activeFaultCodes: point.activeFaultCodes ?? null,
+
+    batteryStateOfCharge: point.batteryStateOfCharge ?? null,
+    batteryTemp: point.batteryTemp ?? null,
+    motorTemp: point.motorTemp ?? null,
+    inverterTemp: point.inverterTemp ?? null,
+
+    recordedAt: point.recordedAt,
+    receivedAt: point.receivedAt,
+    rawPayload: point.rawPayload,
+  };
+};
+
 // API Functions
 
 export async function fetchVehicles(): Promise<Vehicle[]> {
   try {
     const response = await api.get('/vehicles');
-    return response.data.vehicles || [];
+    const vehicles = response.data.vehicles || [];
+
+    return vehicles.map((vehicle: Vehicle) => ({
+      ...vehicle,
+      latestTelemetry: vehicle.latestTelemetry
+        ? toTelemetryPoint(vehicle.latestTelemetry)
+        : null,
+    }));
   } catch (error) {
     console.error('Error fetching vehicles:', error);
     return [];
@@ -92,7 +246,16 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
 export async function fetchVehicle(id: string): Promise<Vehicle | undefined> {
   try {
     const response = await api.get(`/vehicles/${id}`);
-    return response.data.vehicle;
+
+    const vehicle = response.data.vehicle;
+    if (!vehicle) return undefined;
+
+    return {
+      ...vehicle,
+      latestTelemetry: vehicle.latestTelemetry
+        ? toTelemetryPoint(vehicle.latestTelemetry)
+        : null,
+    };
   } catch (error) {
     console.error(`Error fetching vehicle ${id}:`, error);
     return undefined;
@@ -138,25 +301,11 @@ export async function fetchTelemetry(vehicleId?: string, limit?: number): Promis
     
     const response = await api.get('/telemetry', { params });
     const telemetryData = response.data.telemetry || [];
-    
-    // Transform to match chart format
-    return telemetryData.map((point: any, index: number) => {
-      const date = new Date(point.recordedAt);
-      return {
-        time: `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`,
-        engineTemp: point.engineTemp || point.lubOilTemp || 0,
-        batteryVoltage: point.batteryVoltage || 0,
-        speed: point.rpm ? point.rpm / 100 : 0, // Approximate speed from RPM
-        fuelEfficiency: point.fuelEfficiency || 0,
-        vibration: point.vibrationLevel || 0,
-        vibrationLevel: point.vibrationLevel || 0,
-        engineRpm: point.engineRpm || point.rpm || 0,
-        rpm: point.engineRpm || point.rpm || 0,
-        coolantTemp: point.coolantTemp || 0,
-        lubOilPressure: point.lubOilPressure || 0,
-        recordedAt: point.recordedAt,
-      };
-    });
+
+    // Backend returns newest first; reverse to oldest->newest for charts/tables.
+    return telemetryData
+      .map((point: any) => toTelemetryPoint(point))
+      .reverse();
   } catch (error) {
     console.error('Error fetching telemetry:', error);
     return [];
@@ -172,22 +321,8 @@ export async function fetchLatestTelemetry(vehicleId?: string): Promise<Telemetr
     const point = response.data.telemetry;
     
     if (!point) return null;
-    
-    const date = new Date(point.recordedAt);
-    return {
-      time: `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}:${date.getSeconds().toString().padStart(2, '0')}`,
-      engineTemp: point.engineTemp || point.lubOilTemp || 0,
-      batteryVoltage: point.batteryVoltage || 0,
-      speed: point.rpm ? point.rpm / 100 : 0,
-      fuelEfficiency: point.fuelEfficiency || 0,
-      vibration: point.vibrationLevel || 0,
-      vibrationLevel: point.vibrationLevel || 0,
-      engineRpm: point.engineRpm || point.rpm || 0,
-      rpm: point.engineRpm || point.rpm || 0,
-      coolantTemp: point.coolantTemp || 0,
-      lubOilPressure: point.lubOilPressure || 0,
-      recordedAt: point.recordedAt,
-    };
+
+    return toTelemetryPoint(point, true);
   } catch (error) {
     console.error('Error fetching latest telemetry:', error);
     return null;
@@ -253,6 +388,47 @@ export async function fetchInsights(): Promise<InsightsData> {
       severityBreakdown: [],
       topAlertVehicles: [],
     };
+  }
+}
+
+export async function fetchHealthEvaluations(
+  vehicleId?: string,
+  limit?: number
+): Promise<HealthEvaluation[]> {
+  try {
+    const params: any = {};
+    if (vehicleId) params.vehicleId = vehicleId;
+    if (limit) params.limit = limit;
+
+    const response = await api.get('/health-predictions', { params });
+    return response.data.predictions || [];
+  } catch (error) {
+    console.error('Error fetching health evaluations:', error);
+    return [];
+  }
+}
+
+export async function evaluateVehicleLive(
+  vehicleId: string
+): Promise<HealthEvaluation | null> {
+  try {
+    const response = await api.post('/health-predictions/evaluate', { vehicleId });
+    return response.data as HealthEvaluation;
+  } catch (error) {
+    console.error('Error evaluating live vehicle health:', error);
+    return null;
+  }
+}
+
+export async function fetchHealthEvaluation(
+  predictionId: string
+): Promise<HealthEvaluation | null> {
+  try {
+    const response = await api.get(`/health-predictions/${predictionId}`);
+    return response.data.prediction || null;
+  } catch (error) {
+    console.error(`Error fetching health evaluation ${predictionId}:`, error);
+    return null;
   }
 }
 

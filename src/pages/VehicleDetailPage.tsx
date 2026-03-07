@@ -9,6 +9,73 @@ import { fetchVehicle, fetchAlerts, fetchTelemetry } from '@/services/api';
 import type { Vehicle, Alert, TelemetryPoint } from '@/services/api';
 import { Car, User, Gauge, MapPin } from 'lucide-react';
 
+const chartConfigs: Array<{
+  key: keyof TelemetryPoint;
+  label: string;
+  color: string;
+}> = [
+  { key: 'engineRpm', label: 'Engine RPM', color: 'hsl(24, 95%, 53%)' },
+  { key: 'engineTemp', label: 'Engine Temp (deg C)', color: 'hsl(0, 72%, 51%)' },
+  { key: 'coolantTemp', label: 'Coolant Temp (deg C)', color: 'hsl(199, 89%, 48%)' },
+  { key: 'lubOilPressure', label: 'Lub Oil Pressure', color: 'hsl(48, 96%, 53%)' },
+  { key: 'batteryVoltage', label: 'Battery Voltage (V)', color: 'hsl(142, 71%, 45%)' },
+  { key: 'speed', label: 'Speed (km/h)', color: 'hsl(262, 83%, 58%)' },
+];
+
+const latestMetricDefinitions: Array<{
+  key: keyof TelemetryPoint;
+  label: string;
+  unit: string;
+}> = [
+  { key: 'engineRpm', label: 'Engine RPM', unit: '' },
+  { key: 'rpm', label: 'RPM', unit: '' },
+  { key: 'engineLoad', label: 'Engine Load', unit: '%' },
+  { key: 'throttlePosition', label: 'Throttle Position', unit: '%' },
+  { key: 'engineTemp', label: 'Engine Temp', unit: 'deg C' },
+  { key: 'lubOilPressure', label: 'Lub Oil Pressure', unit: 'bar' },
+  { key: 'oilPressure', label: 'Oil Pressure', unit: 'bar' },
+  { key: 'lubOilTemp', label: 'Lub Oil Temp', unit: 'deg C' },
+  { key: 'coolantTemp', label: 'Coolant Temp', unit: 'deg C' },
+  { key: 'coolantPressure', label: 'Coolant Pressure', unit: 'bar' },
+  { key: 'coolantLevel', label: 'Coolant Level', unit: '%' },
+  { key: 'fuelPressure', label: 'Fuel Pressure', unit: 'psi' },
+  { key: 'fuelEfficiency', label: 'Fuel Efficiency', unit: 'km/L' },
+  { key: 'batteryVoltage', label: 'Battery Voltage', unit: 'V' },
+  { key: 'speed', label: 'Speed', unit: 'km/h' },
+  { key: 'mileage', label: 'Mileage', unit: 'km' },
+  { key: 'vibrationLevel', label: 'Vibration Level', unit: '' },
+  { key: 'ambientTemperature', label: 'Ambient Temp', unit: 'deg C' },
+  { key: 'errorCodesCount', label: 'Error Codes', unit: '' },
+  { key: 'batteryStateOfCharge', label: 'Battery SoC', unit: '%' },
+  { key: 'batteryTemp', label: 'Battery Temp', unit: 'deg C' },
+  { key: 'motorTemp', label: 'Motor Temp', unit: 'deg C' },
+  { key: 'inverterTemp', label: 'Inverter Temp', unit: 'deg C' },
+];
+
+const formatMetricValue = (value: unknown, unit = ''): string => {
+  if (value === null || value === undefined) return '--';
+
+  const numericValue = Number(value);
+  if (Number.isFinite(numericValue)) {
+    const formatted = numericValue.toFixed(2).replace(/\.00$/, '');
+    return unit ? `${formatted} ${unit}` : formatted;
+  }
+
+  return String(value);
+};
+
+const toMinuteLabel = (recordedAt?: string): string => {
+  if (!recordedAt) return '--:--';
+  const date = new Date(recordedAt);
+  if (Number.isNaN(date.getTime())) return '--:--';
+
+  return date.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+};
+
 export default function VehicleDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
@@ -25,7 +92,7 @@ export default function VehicleDetailPage() {
         const [vehicleData, alertsData, telemetryData] = await Promise.all([
           fetchVehicle(id),
           fetchAlerts({ vehicleId: id }),
-          fetchTelemetry(id, 24),
+          fetchTelemetry(id, 120),
         ]);
         
         setVehicle(vehicleData || null);
@@ -68,6 +135,12 @@ export default function VehicleDetailPage() {
     { name: 'Transmission', probability: vehicle.healthScore < 60 ? 41 : 3 },
   ];
 
+  const latestTelemetry = telemetry.length > 0
+    ? telemetry[telemetry.length - 1]
+    : vehicle.latestTelemetry || null;
+
+  const telemetryHistory = [...telemetry].reverse();
+
   return (
     <DashboardLayout>
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
@@ -95,12 +168,7 @@ export default function VehicleDetailPage() {
 
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {[
-            { key: 'engineTemp', label: 'Engine Temperature', color: 'hsl(24, 95%, 53%)', unit: '°C' },
-            { key: 'batteryVoltage', label: 'Battery Voltage', color: 'hsl(199, 89%, 48%)', unit: 'V' },
-            { key: 'speed', label: 'Speed', color: 'hsl(142, 71%, 45%)', unit: 'km/h' },
-            { key: 'fuelEfficiency', label: 'Fuel Efficiency', color: 'hsl(48, 96%, 53%)', unit: 'km/L' },
-          ].map(chart => (
+          {chartConfigs.map((chart) => (
             <div key={chart.key} className="glass-card p-4">
               <h3 className="text-sm font-heading uppercase tracking-wider text-muted-foreground mb-3">{chart.label}</h3>
               <ResponsiveContainer width="100%" height={180}>
@@ -114,6 +182,39 @@ export default function VehicleDetailPage() {
               </ResponsiveContainer>
             </div>
           ))}
+        </div>
+
+        {/* Latest full telemetry snapshot */}
+        <div className="glass-card p-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-3">
+            <h3 className="text-sm font-heading uppercase tracking-wider text-muted-foreground">
+              Latest Telemetry Snapshot
+            </h3>
+            <span className="text-xs text-muted-foreground">
+              {latestTelemetry?.recordedAt
+                ? `Recorded ${new Date(latestTelemetry.recordedAt).toLocaleString()}`
+                : 'No telemetry received yet'}
+            </span>
+          </div>
+
+          {latestTelemetry ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+              {latestMetricDefinitions.map((metric) => (
+                <div key={metric.key} className="rounded-md bg-secondary/40 px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    {metric.label}
+                  </div>
+                  <div className="text-sm font-medium text-foreground mt-1">
+                    {formatMetricValue(latestTelemetry[metric.key], metric.unit)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              No telemetry snapshot available for this vehicle
+            </p>
+          )}
         </div>
 
         {/* Fault Probability & Alert Timeline */}
@@ -152,6 +253,66 @@ export default function VehicleDetailPage() {
               )}
             </div>
           </div>
+        </div>
+
+        {/* Minute-wise historical telemetry table */}
+        <div className="glass-card p-4">
+          <h3 className="text-sm font-heading uppercase tracking-wider text-muted-foreground mb-3">
+            Telemetry History (Minute-wise)
+          </h3>
+
+          {telemetryHistory.length > 0 ? (
+            <div className="overflow-x-auto scrollbar-thin">
+              <table className="w-full min-w-[1280px] text-xs">
+                <thead>
+                  <tr className="text-left text-muted-foreground border-b border-border/60">
+                    <th className="py-2 pr-3 font-medium">Time</th>
+                    <th className="py-2 pr-3 font-medium">RPM</th>
+                    <th className="py-2 pr-3 font-medium">Engine Temp</th>
+                    <th className="py-2 pr-3 font-medium">Coolant Temp</th>
+                    <th className="py-2 pr-3 font-medium">Lub Oil P</th>
+                    <th className="py-2 pr-3 font-medium">Fuel P</th>
+                    <th className="py-2 pr-3 font-medium">Battery V</th>
+                    <th className="py-2 pr-3 font-medium">Speed</th>
+                    <th className="py-2 pr-3 font-medium">Mileage</th>
+                    <th className="py-2 pr-3 font-medium">Vibration</th>
+                    <th className="py-2 pr-3 font-medium">Fuel Eff.</th>
+                    <th className="py-2 pr-3 font-medium">Err Codes</th>
+                    <th className="py-2 pr-3 font-medium">Ambient</th>
+                    <th className="py-2 pr-3 font-medium">Battery SoC</th>
+                    <th className="py-2 pr-3 font-medium">Motor Temp</th>
+                    <th className="py-2 pr-3 font-medium">Inverter Temp</th>
+                    <th className="py-2 font-medium">Source</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {telemetryHistory.map((point) => (
+                    <tr key={point.id || `${point.vehicleId}-${point.recordedAt}`} className="border-b border-border/40 text-foreground">
+                      <td className="py-2 pr-3">{toMinuteLabel(point.recordedAt)}</td>
+                      <td className="py-2 pr-3">{formatMetricValue(point.engineRpm)}</td>
+                      <td className="py-2 pr-3">{formatMetricValue(point.engineTemp, 'deg C')}</td>
+                      <td className="py-2 pr-3">{formatMetricValue(point.coolantTemp, 'deg C')}</td>
+                      <td className="py-2 pr-3">{formatMetricValue(point.lubOilPressure, 'bar')}</td>
+                      <td className="py-2 pr-3">{formatMetricValue(point.fuelPressure, 'psi')}</td>
+                      <td className="py-2 pr-3">{formatMetricValue(point.batteryVoltage, 'V')}</td>
+                      <td className="py-2 pr-3">{formatMetricValue(point.speed, 'km/h')}</td>
+                      <td className="py-2 pr-3">{formatMetricValue(point.mileage, 'km')}</td>
+                      <td className="py-2 pr-3">{formatMetricValue(point.vibrationLevel)}</td>
+                      <td className="py-2 pr-3">{formatMetricValue(point.fuelEfficiency, 'km/L')}</td>
+                      <td className="py-2 pr-3">{formatMetricValue(point.errorCodesCount)}</td>
+                      <td className="py-2 pr-3">{formatMetricValue(point.ambientTemperature, 'deg C')}</td>
+                      <td className="py-2 pr-3">{formatMetricValue(point.batteryStateOfCharge, '%')}</td>
+                      <td className="py-2 pr-3">{formatMetricValue(point.motorTemp, 'deg C')}</td>
+                      <td className="py-2 pr-3">{formatMetricValue(point.inverterTemp, 'deg C')}</td>
+                      <td className="py-2">{point.source || '--'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground py-4 text-center">No historical telemetry data available</p>
+          )}
         </div>
       </motion.div>
     </DashboardLayout>

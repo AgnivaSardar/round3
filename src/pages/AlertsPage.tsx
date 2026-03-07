@@ -3,24 +3,43 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Filter } from 'lucide-react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { AlertCard } from '@/components/AlertCard';
-import { fetchAlerts, acknowledgeAlert } from '@/services/api';
-import type { Alert } from '@/services/api';
+import { fetchAlerts, acknowledgeAlert, fetchVehicles } from '@/services/api';
+import type { Alert, Vehicle } from '@/services/api';
 
 type SeverityFilter = 'all' | 'critical' | 'warning' | 'anomaly';
 
+const getVehicleIdentifier = (vehicle: Vehicle): string => vehicle.vehicleId || vehicle.id;
+
 export default function AlertsPage() {
   const [alertList, setAlertList] = useState<Alert[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [filter, setFilter] = useState<SeverityFilter>('all');
+  const [selectedVehicleId, setSelectedVehicleId] = useState('all');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadAlerts();
+    async function loadVehicles() {
+      try {
+        const data = await fetchVehicles();
+        setVehicles(data);
+      } catch (error) {
+        console.error('Error loading vehicles for alerts:', error);
+      }
+    }
+
+    loadVehicles();
   }, []);
+
+  useEffect(() => {
+    loadAlerts();
+  }, [selectedVehicleId]);
 
   async function loadAlerts() {
     setLoading(true);
     try {
-      const data = await fetchAlerts();
+      const data = await fetchAlerts(
+        selectedVehicleId === 'all' ? undefined : { vehicleId: selectedVehicleId }
+      );
       setAlertList(data);
     } catch (error) {
       console.error('Error loading alerts:', error);
@@ -30,6 +49,10 @@ export default function AlertsPage() {
   }
 
   const filtered = filter === 'all' ? alertList : alertList.filter(a => a.severity === filter);
+
+  const selectedVehicle = selectedVehicleId === 'all'
+    ? null
+    : vehicles.find((vehicle) => getVehicleIdentifier(vehicle) === selectedVehicleId) || null;
 
   const handleAcknowledge = async (id: string) => {
     try {
@@ -70,21 +93,44 @@ export default function AlertsPage() {
         <div>
           <h1 className="text-2xl font-heading font-bold text-foreground">Alert Monitoring</h1>
           <p className="text-sm text-muted-foreground">Detected faults and abnormal events</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {selectedVehicle
+              ? `Showing alerts for ${selectedVehicle.name} (${selectedVehicle.plate})`
+              : 'Showing alerts for all vehicles'}
+          </p>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <Filter className="h-4 w-4 text-muted-foreground" />
-          {filterButtons.map(fb => (
-            <button
-              key={fb.key}
-              onClick={() => setFilter(fb.key)}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                filter === fb.key ? fb.color + ' ring-1 ring-current' : 'bg-secondary/50 text-muted-foreground hover:bg-secondary'
-              }`}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            {filterButtons.map(fb => (
+              <button
+                key={fb.key}
+                onClick={() => setFilter(fb.key)}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                  filter === fb.key ? fb.color + ' ring-1 ring-current' : 'bg-secondary/50 text-muted-foreground hover:bg-secondary'
+                }`}
+              >
+                {fb.label} ({counts[fb.key]})
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Vehicle</span>
+            <select
+              value={selectedVehicleId}
+              onChange={(event) => setSelectedVehicleId(event.target.value)}
+              className="bg-secondary/50 border border-border rounded px-3 py-1.5 text-xs text-foreground min-w-56"
             >
-              {fb.label} ({counts[fb.key]})
-            </button>
-          ))}
+              <option value="all">All Vehicles</option>
+              {vehicles.map((vehicle) => (
+                <option key={vehicle.id} value={getVehicleIdentifier(vehicle)}>
+                  {vehicle.name} ({vehicle.plate})
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <AnimatePresence mode="popLayout">
@@ -94,7 +140,7 @@ export default function AlertsPage() {
             ))}
             {filtered.length === 0 && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass-card p-8 text-center text-muted-foreground">
-                No alerts match this filter.
+                No alerts match this filter for the selected vehicle.
               </motion.div>
             )}
           </div>

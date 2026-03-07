@@ -9,6 +9,7 @@ import AlertsPage from "./pages/AlertsPage";
 import VehiclesPage from "./pages/VehiclesPage";
 import VehicleDetailPage from "./pages/VehicleDetailPage";
 import LiveTelemetryPage from "./pages/LiveTelemetryPage";
+import LiveEvaluationPage from "./pages/LiveEvaluationPage";
 import InsightsPage from "./pages/InsightsPage";
 import NotFound from "./pages/NotFound";
 import LandingPage from "./pages/LandingPage";
@@ -40,6 +41,7 @@ function AppRoutes() {
           <Route path="/vehicles" element={<PageTransition><VehiclesPage /></PageTransition>} />
           <Route path="/vehicles/:id" element={<PageTransition><VehicleDetailPage /></PageTransition>} />
           <Route path="/telemetry" element={<PageTransition><LiveTelemetryPage /></PageTransition>} />
+          <Route path="/evaluation" element={<PageTransition><LiveEvaluationPage /></PageTransition>} />
           <Route path="/insights" element={<PageTransition><InsightsPage /></PageTransition>} />
           <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
         </Routes>

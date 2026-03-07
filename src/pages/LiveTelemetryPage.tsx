@@ -7,6 +7,27 @@ import { fetchLiveTelemetry } from '@/services/api';
 import type { TelemetryPoint } from '@/services/api';
 import { Play, Pause, Radio } from 'lucide-react';
 
+const liveChartConfigs: Array<{
+  key: keyof TelemetryPoint;
+  label: string;
+  color: string;
+}> = [
+  { key: 'speed', label: 'Speed (km/h)', color: 'hsl(199, 89%, 48%)' },
+  { key: 'engineRpm', label: 'Engine RPM', color: 'hsl(24, 95%, 53%)' },
+  { key: 'engineTemp', label: 'Engine Temperature (deg C)', color: 'hsl(0, 72%, 51%)' },
+  { key: 'coolantTemp', label: 'Coolant Temperature (deg C)', color: 'hsl(262, 83%, 58%)' },
+  { key: 'lubOilPressure', label: 'Lub Oil Pressure', color: 'hsl(48, 96%, 53%)' },
+  { key: 'fuelPressure', label: 'Fuel Pressure', color: 'hsl(38, 92%, 50%)' },
+  { key: 'batteryVoltage', label: 'Battery Voltage (V)', color: 'hsl(142, 71%, 45%)' },
+  { key: 'vibrationLevel', label: 'Vibration Level', color: 'hsl(330, 81%, 60%)' },
+];
+
+const toDisplay = (value: number | null | undefined, digits = 2): string => {
+  if (value === null || value === undefined) return '--';
+  if (!Number.isFinite(value)) return '--';
+  return value.toFixed(digits).replace(/\.00$/, '');
+};
+
 export default function LiveTelemetryPage() {
   const [data, setData] = useState<TelemetryPoint[]>([]);
   const [latest, setLatest] = useState<TelemetryPoint | null>(null);
@@ -45,10 +66,15 @@ export default function LiveTelemetryPage() {
   const defaultPoint: TelemetryPoint = {
     time: '00:00:00',
     speed: 0,
+    engineRpm: 0,
     engineTemp: 0,
+    coolantTemp: 0,
+    lubOilPressure: 0,
+    fuelPressure: 0,
     batteryVoltage: 0,
     fuelEfficiency: 0,
     vibration: 0,
+    vibrationLevel: 0,
   };
 
   const currentPoint = latest || defaultPoint;
@@ -75,7 +101,7 @@ export default function LiveTelemetryPage() {
 
         {/* Gauges */}
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass-card p-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 justify-items-center">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-6 justify-items-center">
             <GaugeChart 
               value={currentPoint.speed || 0} 
               max={180} 
@@ -84,13 +110,29 @@ export default function LiveTelemetryPage() {
               size={140} 
               thresholds={{ warning: 120, critical: 150 }} 
             />
+            <GaugeChart
+              value={currentPoint.engineRpm || 0}
+              max={7000}
+              label="Engine RPM"
+              unit="rpm"
+              size={140}
+              thresholds={{ warning: 4500, critical: 6000 }}
+            />
             <GaugeChart 
               value={currentPoint.engineTemp || 0} 
               max={130} 
               label="Engine Temp" 
-              unit="°C" 
+              unit="deg C" 
               size={140} 
               thresholds={{ warning: 95, critical: 110 }} 
+            />
+            <GaugeChart
+              value={currentPoint.coolantTemp || 0}
+              max={130}
+              label="Coolant Temp"
+              unit="deg C"
+              size={140}
+              thresholds={{ warning: 100, critical: 112 }}
             />
             <GaugeChart 
               value={currentPoint.batteryVoltage || 0} 
@@ -101,23 +143,37 @@ export default function LiveTelemetryPage() {
               thresholds={{ warning: 11.5, critical: 10.5 }} 
             />
             <GaugeChart 
-              value={currentPoint.fuelEfficiency || 0} 
-              max={16} 
-              label="Fuel Eff." 
-              unit="km/L" 
+              value={currentPoint.lubOilPressure || 0}
+              max={10}
+              label="Lub Oil P"
+              unit="bar"
               size={140} 
+              thresholds={{ warning: 2.0, critical: 1.0 }}
             />
           </div>
         </motion.div>
 
+        <div className="glass-card p-4">
+          <h3 className="text-sm font-heading uppercase tracking-wider text-muted-foreground mb-3">Latest Telemetry Packet</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-2 text-xs">
+            <div className="rounded bg-secondary/40 px-3 py-2"><span className="text-muted-foreground">Time</span><p className="text-sm text-foreground mt-1">{currentPoint.time}</p></div>
+            <div className="rounded bg-secondary/40 px-3 py-2"><span className="text-muted-foreground">Engine RPM</span><p className="text-sm text-foreground mt-1">{toDisplay(currentPoint.engineRpm ?? null, 0)}</p></div>
+            <div className="rounded bg-secondary/40 px-3 py-2"><span className="text-muted-foreground">Engine Temp</span><p className="text-sm text-foreground mt-1">{toDisplay(currentPoint.engineTemp ?? null, 1)} deg C</p></div>
+            <div className="rounded bg-secondary/40 px-3 py-2"><span className="text-muted-foreground">Coolant Temp</span><p className="text-sm text-foreground mt-1">{toDisplay(currentPoint.coolantTemp ?? null, 1)} deg C</p></div>
+            <div className="rounded bg-secondary/40 px-3 py-2"><span className="text-muted-foreground">Lub Oil Pressure</span><p className="text-sm text-foreground mt-1">{toDisplay(currentPoint.lubOilPressure ?? null, 2)} bar</p></div>
+            <div className="rounded bg-secondary/40 px-3 py-2"><span className="text-muted-foreground">Fuel Pressure</span><p className="text-sm text-foreground mt-1">{toDisplay(currentPoint.fuelPressure ?? null, 2)} psi</p></div>
+            <div className="rounded bg-secondary/40 px-3 py-2"><span className="text-muted-foreground">Battery Voltage</span><p className="text-sm text-foreground mt-1">{toDisplay(currentPoint.batteryVoltage ?? null, 2)} V</p></div>
+            <div className="rounded bg-secondary/40 px-3 py-2"><span className="text-muted-foreground">Speed</span><p className="text-sm text-foreground mt-1">{toDisplay(currentPoint.speed ?? null, 1)} km/h</p></div>
+            <div className="rounded bg-secondary/40 px-3 py-2"><span className="text-muted-foreground">Mileage</span><p className="text-sm text-foreground mt-1">{toDisplay(currentPoint.mileage ?? null, 1)} km</p></div>
+            <div className="rounded bg-secondary/40 px-3 py-2"><span className="text-muted-foreground">Fuel Efficiency</span><p className="text-sm text-foreground mt-1">{toDisplay(currentPoint.fuelEfficiency ?? null, 2)} km/L</p></div>
+            <div className="rounded bg-secondary/40 px-3 py-2"><span className="text-muted-foreground">Vibration</span><p className="text-sm text-foreground mt-1">{toDisplay(currentPoint.vibrationLevel ?? null, 2)}</p></div>
+            <div className="rounded bg-secondary/40 px-3 py-2"><span className="text-muted-foreground">Error Codes</span><p className="text-sm text-foreground mt-1">{toDisplay(currentPoint.errorCodesCount ?? null, 0)}</p></div>
+          </div>
+        </div>
+
         {/* Live Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {[
-            { key: 'speed', label: 'Speed (km/h)', color: 'hsl(199, 89%, 48%)' },
-            { key: 'engineTemp', label: 'Engine Temperature (°C)', color: 'hsl(24, 95%, 53%)' },
-            { key: 'batteryVoltage', label: 'Battery Voltage (V)', color: 'hsl(142, 71%, 45%)' },
-            { key: 'vibration', label: 'Vibration Level', color: 'hsl(48, 96%, 53%)' },
-          ].map(chart => (
+          {liveChartConfigs.map((chart) => (
             <div key={chart.key} className="glass-card p-4">
               <h3 className="text-sm font-heading uppercase tracking-wider text-muted-foreground mb-3">{chart.label}</h3>
               <ResponsiveContainer width="100%" height={180}>

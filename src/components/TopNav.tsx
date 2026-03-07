@@ -1,12 +1,12 @@
 import { NavLink as RouterNavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, AlertTriangle, Car, Activity, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, AlertTriangle, Car, Activity, BarChart3, BrainCircuit } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/alerts', label: 'Alerts', icon: AlertTriangle },
   { to: '/vehicles', label: 'Vehicles', icon: Car },
-  { to: '/telemetry', label: 'Telemetry', icon: Activity },
+  { to: '/evaluation', label: 'Evaluation', icon: BrainCircuit },
   { to: '/insights', label: 'Insights', icon: BarChart3 },
 ];
 
