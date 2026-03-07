@@ -59,7 +59,7 @@ export default function DashboardPage() {
           <div className="glass-card p-4">
             <h3 className="text-sm font-heading uppercase tracking-wider text-muted-foreground mb-3">Engine Temperature</h3>
             <ResponsiveContainer width="100%" height={200}>
-              <AreaChart data={telemetry} style={chartStyle}>
+              <AreaChart data={telemetry} style={chartStyle} className="text-muted-foreground">
                 <defs>
                   <linearGradient id="tempGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="hsl(24, 95%, 53%)" stopOpacity={0.3} />
@@ -67,9 +67,9 @@ export default function DashboardPage() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 18%)" />
-                <XAxis dataKey="time" stroke="hsl(215, 15%, 55%)" fontSize={10} />
-                <YAxis stroke="hsl(215, 15%, 55%)" fontSize={10} />
-                <Tooltip contentStyle={{ background: 'hsl(220, 18%, 10%)', border: '1px solid hsl(220, 13%, 18%)', borderRadius: 8, fontSize: 12 }} />
+                <XAxis dataKey="time" stroke="currentColor" fontSize={10} />
+                <YAxis stroke="currentColor" fontSize={10} />
+                <Tooltip contentStyle={{ background: 'hsl(228, 26%, 96%)', border: '1px solid hsl(220, 13%, 18%)', borderRadius: 8, fontSize: 12 }} labelStyle={{ color: 'hsl(215, 15%, 55%)' }} itemStyle={{ color: 'hsl(199, 89%, 48%)' }} />
                 <Area type="monotone" dataKey="engineTemp" stroke="hsl(24, 95%, 53%)" fill="url(#tempGrad)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
@@ -78,11 +78,11 @@ export default function DashboardPage() {
           <div className="glass-card p-4">
             <h3 className="text-sm font-heading uppercase tracking-wider text-muted-foreground mb-3">Battery Voltage</h3>
             <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={telemetry} style={chartStyle}>
+              <LineChart data={telemetry} style={chartStyle} className="text-muted-foreground">
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 18%)" />
-                <XAxis dataKey="time" stroke="hsl(215, 15%, 55%)" fontSize={10} />
-                <YAxis stroke="hsl(215, 15%, 55%)" fontSize={10} domain={[10, 14]} />
-                <Tooltip contentStyle={{ background: 'hsl(220, 18%, 10%)', border: '1px solid hsl(220, 13%, 18%)', borderRadius: 8, fontSize: 12 }} />
+                <XAxis dataKey="time" stroke="currentColor" fontSize={10} />
+                <YAxis stroke="currentColor" fontSize={10} domain={[10, 14]} />
+                <Tooltip contentStyle={{ background: 'hsl(225, 100%, 99%)', border: '1px solid hsl(220, 13%, 18%)', borderRadius: 8, fontSize: 12 }} labelStyle={{ color: 'hsl(215, 15%, 55%)' }} itemStyle={{ color: 'hsl(199, 89%, 48%)' }} />
                 <Line type="monotone" dataKey="batteryVoltage" stroke="hsl(199, 89%, 48%)" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
@@ -91,7 +91,7 @@ export default function DashboardPage() {
           <div className="glass-card p-4">
             <h3 className="text-sm font-heading uppercase tracking-wider text-muted-foreground mb-3">Speed</h3>
             <ResponsiveContainer width="100%" height={200}>
-              <AreaChart data={telemetry} style={chartStyle}>
+              <AreaChart data={telemetry} style={chartStyle} className="text-muted-foreground">
                 <defs>
                   <linearGradient id="speedGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="hsl(199, 89%, 48%)" stopOpacity={0.3} />
@@ -99,9 +99,9 @@ export default function DashboardPage() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 18%)" />
-                <XAxis dataKey="time" stroke="hsl(215, 15%, 55%)" fontSize={10} />
-                <YAxis stroke="hsl(215, 15%, 55%)" fontSize={10} />
-                <Tooltip contentStyle={{ background: 'hsl(220, 18%, 10%)', border: '1px solid hsl(220, 13%, 18%)', borderRadius: 8, fontSize: 12 }} />
+                <XAxis dataKey="time" stroke="currentColor" fontSize={10} />
+                <YAxis stroke="currentColor" fontSize={10} />
+                <Tooltip contentStyle={{ background: 'hsl(220, 23%, 98%)', border: '1px solid hsl(220, 13%, 18%)', borderRadius: 8, fontSize: 12 }} labelStyle={{ color: 'hsl(215, 15%, 55%)' }} itemStyle={{ color: 'hsl(199, 89%, 48%)' }} />
                 <Area type="monotone" dataKey="speed" stroke="hsl(199, 89%, 48%)" fill="url(#speedGrad)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
@@ -110,11 +110,11 @@ export default function DashboardPage() {
           <div className="glass-card p-4">
             <h3 className="text-sm font-heading uppercase tracking-wider text-muted-foreground mb-3">Fuel Efficiency</h3>
             <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={telemetry} style={chartStyle}>
+              <LineChart data={telemetry} style={chartStyle} className="text-muted-foreground">
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 18%)" />
-                <XAxis dataKey="time" stroke="hsl(215, 15%, 55%)" fontSize={10} />
-                <YAxis stroke="hsl(215, 15%, 55%)" fontSize={10} />
-                <Tooltip contentStyle={{ background: 'hsl(220, 18%, 10%)', border: '1px solid hsl(220, 13%, 18%)', borderRadius: 8, fontSize: 12 }} />
+                <XAxis dataKey="time" stroke="currentColor" fontSize={10} />
+                <YAxis stroke="currentColor" fontSize={10} />
+                <Tooltip contentStyle={{ background: 'hsl(220, 18%, 97%)', border: '1px solid hsl(220, 13%, 18%)', borderRadius: 8, fontSize: 12 }} labelStyle={{ color: 'hsl(215, 15%, 55%)' }} itemStyle={{ color: 'hsl(142, 71%, 45%)' }} />
                 <Line type="monotone" dataKey="fuelEfficiency" stroke="hsl(142, 71%, 45%)" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>

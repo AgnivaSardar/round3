@@ -24,7 +24,7 @@ export default function InsightsPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 18%)" />
                 <XAxis type="number" stroke="hsl(215, 15%, 55%)" fontSize={10} />
                 <YAxis type="category" dataKey="name" stroke="hsl(215, 15%, 55%)" fontSize={11} width={120} />
-                <Tooltip contentStyle={{ background: 'hsl(220, 18%, 10%)', border: '1px solid hsl(220, 13%, 18%)', borderRadius: 8, fontSize: 12 }} />
+                <Tooltip wrapperStyle={{ zIndex: 1000 }} contentStyle={{ background: 'hsl(220, 43%, 99%)', border: '1px solid hsl(220, 13%, 18%)', borderRadius: 8, fontSize: 12 }} labelStyle={{ color: 'hsl(215, 15%, 55%)' }} itemStyle={{ color: 'hsl(215, 15%, 55%)' }} />
                 <Bar dataKey="count" radius={[0, 4, 4, 0]}>
                   {insightsData.commonFaults.map((entry, i) => (
                     <Cell key={i} fill={entry.fill} />
@@ -58,7 +58,7 @@ export default function InsightsPage() {
                 <Legend
                   formatter={(value) => <span style={{ color: 'hsl(210, 20%, 85%)', fontSize: 12 }}>{value}</span>}
                 />
-                <Tooltip contentStyle={{ background: 'hsl(220, 18%, 10%)', border: '1px solid hsl(220, 13%, 18%)', borderRadius: 8, fontSize: 12 }} />
+                <Tooltip wrapperStyle={{ zIndex: 1000 }} contentStyle={{ background: 'hsl(223, 47%, 97%)', border: '1px solid hsl(220, 13%, 18%)', borderRadius: 8, fontSize: 12 }} labelStyle={{ color: 'hsl(215, 15%, 55%)' }} itemStyle={{ color: 'hsl(215, 15%, 55%)' }} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -73,7 +73,7 @@ export default function InsightsPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 18%)" />
                 <XAxis dataKey="vehicle" stroke="hsl(215, 15%, 55%)" fontSize={11} />
                 <YAxis stroke="hsl(215, 15%, 55%)" fontSize={10} />
-                <Tooltip contentStyle={{ background: 'hsl(220, 18%, 10%)', border: '1px solid hsl(220, 13%, 18%)', borderRadius: 8, fontSize: 12 }} />
+                <Tooltip wrapperStyle={{ zIndex: 1000 }} contentStyle={{ background: 'hsl(180, 14%, 99%)', border: '1px solid hsl(220, 13%, 18%)', borderRadius: 8, fontSize: 12 }} labelStyle={{ color: 'hsl(215, 15%, 55%)' }} itemStyle={{ color: 'hsl(215, 15%, 55%)' }} />
                 <Bar dataKey="alerts" fill="hsl(199, 89%, 48%)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
