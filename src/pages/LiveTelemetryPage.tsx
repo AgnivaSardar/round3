@@ -177,11 +177,11 @@ export default function LiveTelemetryPage() {
             <div key={chart.key} className="glass-card p-4">
               <h3 className="text-sm font-heading uppercase tracking-wider text-muted-foreground mb-3">{chart.label}</h3>
               <ResponsiveContainer width="100%" height={180}>
-                <LineChart data={data}>
+                <LineChart data={data} className="text-muted-foreground">
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 18%)" />
-                  <XAxis dataKey="time" stroke="hsl(215, 15%, 55%)" fontSize={10} />
-                  <YAxis stroke="hsl(215, 15%, 55%)" fontSize={10} />
-                  <Tooltip contentStyle={{ background: 'hsl(220, 18%, 10%)', border: '1px solid hsl(220, 13%, 18%)', borderRadius: 8, fontSize: 12 }} />
+                  <XAxis dataKey="time" stroke="currentColor" fontSize={10} />
+                  <YAxis stroke="currentColor" fontSize={10} />
+                  <Tooltip contentStyle={{ background: 'hsl(220, 18%, 10%)', border: '1px solid hsl(220, 13%, 18%)', borderRadius: 8, fontSize: 12 }} labelStyle={{ color: 'hsl(215, 15%, 55%)' }} itemStyle={{ color: chart.color }} />
                   <Line type="monotone" dataKey={chart.key} stroke={chart.color} strokeWidth={2} dot={false} isAnimationActive={false} />
                 </LineChart>
               </ResponsiveContainer>
