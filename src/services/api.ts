@@ -184,9 +184,35 @@ const toTelemetryPoint = (
   point: any,
   includeSeconds = false
 ): TelemetryPoint => {
+  const rawPayload =
+    point.rawPayload && typeof point.rawPayload === 'object'
+      ? (point.rawPayload as Record<string, unknown>)
+      : null;
+
+  const getRawValue = (...keys: string[]): unknown => {
+    if (!rawPayload) return undefined;
+
+    for (const key of keys) {
+      const value = rawPayload[key];
+      if (value !== undefined && value !== null && value !== '') return value;
+    }
+
+    return undefined;
+  };
+
+  const getRawNumber = (...keys: string[]): number | null => {
+    const value = getRawValue(...keys);
+    if (value === undefined || value === null || value === '') return null;
+
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
   const speedValue =
     point.speed !== undefined && point.speed !== null
       ? Number(point.speed)
+      : getRawNumber('speed', 'vehicleSpeed', 'vehicle_speed') !== null
+      ? Number(getRawNumber('speed', 'vehicleSpeed', 'vehicle_speed'))
       : point.rpm !== undefined && point.rpm !== null
       ? Number(point.rpm) / 100
       : null;
@@ -200,8 +226,11 @@ const toTelemetryPoint = (
 
     engineRpm: point.engineRpm ?? null,
     rpm: point.rpm ?? null,
-    engineLoad: point.engineLoad ?? null,
-    throttlePosition: point.throttlePosition ?? null,
+    engineLoad: point.engineLoad ?? getRawNumber('engineLoad', 'engine_load') ?? null,
+    throttlePosition:
+      point.throttlePosition ??
+      getRawNumber('throttlePosition', 'throttle_position') ??
+      null,
     engineTemp: point.engineTemp ?? point.lubOilTemp ?? null,
 
     lubOilPressure: point.lubOilPressure ?? null,
@@ -223,14 +252,21 @@ const toTelemetryPoint = (
     vibration: point.vibrationLevel ?? null,
     vibrationLevel: point.vibrationLevel ?? null,
 
-    ambientTemperature: point.ambientTemperature ?? null,
+    ambientTemperature:
+      point.ambientTemperature ?? getRawNumber('ambientTemperature', 'ambient_temperature') ?? null,
     errorCodesCount: point.errorCodesCount ?? null,
-    activeFaultCodes: point.activeFaultCodes ?? null,
+    activeFaultCodes:
+      point.activeFaultCodes ??
+      getRawValue('activeFaultCodes', 'active_fault_codes') ??
+      null,
 
-    batteryStateOfCharge: point.batteryStateOfCharge ?? null,
-    batteryTemp: point.batteryTemp ?? null,
-    motorTemp: point.motorTemp ?? null,
-    inverterTemp: point.inverterTemp ?? null,
+    batteryStateOfCharge:
+      point.batteryStateOfCharge ??
+      getRawNumber('batteryStateOfCharge', 'battery_state_of_charge', 'soc') ??
+      null,
+    batteryTemp: point.batteryTemp ?? getRawNumber('batteryTemp', 'battery_temp') ?? null,
+    motorTemp: point.motorTemp ?? getRawNumber('motorTemp', 'motor_temp') ?? null,
+    inverterTemp: point.inverterTemp ?? getRawNumber('inverterTemp', 'inverter_temp') ?? null,
 
     recordedAt: point.recordedAt,
     receivedAt: point.receivedAt,
