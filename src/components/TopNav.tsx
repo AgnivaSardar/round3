@@ -1,14 +1,23 @@
 import { NavLink as RouterNavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, AlertTriangle, Car, Activity, BarChart3, BrainCircuit } from 'lucide-react';
+import { LayoutDashboard, AlertTriangle, Car, Activity, BarChart3, BrainCircuit, PlusCircle } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/alerts', label: 'Alerts', icon: AlertTriangle },
   { to: '/vehicles', label: 'Vehicles', icon: Car },
+  { to: '/vehicles/new', label: 'Add Vehicle', icon: PlusCircle },
   { to: '/evaluation', label: 'Evaluation', icon: BrainCircuit },
   { to: '/insights', label: 'Insights', icon: BarChart3 },
 ];
+
+const isNavItemActive = (pathname: string, itemPath: string): boolean => {
+  if (itemPath === '/vehicles') {
+    return pathname === '/vehicles' || (pathname.startsWith('/vehicles/') && pathname !== '/vehicles/new');
+  }
+
+  return pathname.startsWith(itemPath);
+};
 
 export function TopNav() {
   const location = useLocation();
@@ -24,7 +33,7 @@ export function TopNav() {
 
       <nav className="flex items-center gap-1">
         {navItems.map(item => {
-          const isActive = location.pathname.startsWith(item.to);
+          const isActive = isNavItemActive(location.pathname, item.to);
           return (
             <RouterNavLink
               key={item.to}

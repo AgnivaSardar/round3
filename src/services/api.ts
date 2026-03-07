@@ -149,6 +149,20 @@ export interface HealthEvaluation {
   } | null;
 }
 
+export interface CreateVehiclePayload {
+  userId?: string;
+  vehicleNumber?: string;
+  model?: string;
+  manufacturer?: string;
+  year?: number;
+  vehicleType?: string;
+  vin?: string;
+  engineType?: string;
+  fuelType: string;
+  registrationDate?: string;
+  status?: string;
+}
+
 const toTimeLabel = (value?: string, includeSeconds = false): string => {
   if (!value) return '--:--';
 
@@ -259,6 +273,26 @@ export async function fetchVehicle(id: string): Promise<Vehicle | undefined> {
   } catch (error) {
     console.error(`Error fetching vehicle ${id}:`, error);
     return undefined;
+  }
+}
+
+export async function createVehicle(payload: CreateVehiclePayload): Promise<Vehicle | null> {
+  try {
+    const response = await api.post('/vehicles', payload);
+    const vehicleData = response.data?.vehicle || response.data;
+
+    if (!vehicleData) return null;
+
+    const vehicle = vehicleData as Vehicle;
+    return {
+      ...vehicle,
+      latestTelemetry: vehicle.latestTelemetry
+        ? toTelemetryPoint(vehicle.latestTelemetry as any)
+        : null,
+    };
+  } catch (error) {
+    console.error('Error creating vehicle:', error);
+    return null;
   }
 }
 

@@ -7,6 +7,7 @@ import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import DashboardPage from "./pages/DashboardPage";
 import AlertsPage from "./pages/AlertsPage";
 import VehiclesPage from "./pages/VehiclesPage";
+import AddVehiclePage from "./pages/AddVehiclePage";
 import VehicleDetailPage from "./pages/VehicleDetailPage";
 import LiveTelemetryPage from "./pages/LiveTelemetryPage";
 import LiveEvaluationPage from "./pages/LiveEvaluationPage";
@@ -39,6 +40,7 @@ function AppRoutes() {
           <Route path="/dashboard" element={<PageTransition><DashboardPage /></PageTransition>} />
           <Route path="/alerts" element={<PageTransition><AlertsPage /></PageTransition>} />
           <Route path="/vehicles" element={<PageTransition><VehiclesPage /></PageTransition>} />
+          <Route path="/vehicles/new" element={<PageTransition><AddVehiclePage /></PageTransition>} />
           <Route path="/vehicles/:id" element={<PageTransition><VehicleDetailPage /></PageTransition>} />
           <Route path="/telemetry" element={<PageTransition><LiveTelemetryPage /></PageTransition>} />
           <Route path="/evaluation" element={<PageTransition><LiveEvaluationPage /></PageTransition>} />
