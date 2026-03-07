@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { HealthScore } from '@/components/HealthScore';
 import { AlertCard } from '@/components/AlertCard';
+import { SafeRangeLineChart } from '@/components/SafeRangeLineChart';
 import { fetchVehicle, fetchAlerts, fetchTelemetry } from '@/services/api';
 import type { Vehicle, Alert, TelemetryPoint } from '@/services/api';
 import { Car, User, Gauge, MapPin, Download } from 'lucide-react';
@@ -291,15 +291,13 @@ export default function VehicleDetailPage() {
           {chartConfigs.map((chart) => (
             <div key={chart.key} className="glass-card p-4">
               <h3 className="text-sm font-heading uppercase tracking-wider text-muted-foreground mb-3">{chart.label}</h3>
-              <ResponsiveContainer width="100%" height={180}>
-                <LineChart data={telemetry} className="text-muted-foreground">
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 18%)" />
-                  <XAxis dataKey="time" stroke="currentColor" fontSize={10} />
-                  <YAxis stroke="currentColor" fontSize={10} />
-                  <Tooltip contentStyle={{ background: 'hsl(220, 18%, 10%)', border: '1px solid hsl(220, 13%, 18%)', borderRadius: 8, fontSize: 12 }} labelStyle={{ color: 'hsl(215, 15%, 55%)' }} itemStyle={{ color: chart.color }} />
-                  <Line type="monotone" dataKey={chart.key} stroke={chart.color} strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
+              <SafeRangeLineChart
+                data={telemetry}
+                metricKey={chart.key}
+                color={chart.color}
+                height={180}
+                strokeWidth={2}
+              />
             </div>
           ))}
         </div>

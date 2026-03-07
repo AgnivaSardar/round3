@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Activity, AlertTriangle, Car, Gauge, Thermometer, Zap } from 'lucide-react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { GaugeChart } from '@/components/GaugeChart';
 import { HealthScore } from '@/components/HealthScore';
 import { MetricCard } from '@/components/MetricCard';
 import { AlertCard } from '@/components/AlertCard';
+import { SafeRangeLineChart } from '@/components/SafeRangeLineChart';
 import {
   fetchVehicles,
   fetchAlerts,
@@ -474,23 +474,13 @@ export default function DashboardPage() {
             {dashboardChartConfigs.map((chart) => (
               <div key={chart.key} className="glass-card p-5 hover:shadow-lg transition-shadow">
                 <h3 className="text-sm font-heading font-medium text-foreground mb-4">{chart.label}</h3>
-                <ResponsiveContainer width="100%" height={220}>
-                  <LineChart data={telemetry}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 18%)" opacity={0.3} />
-                    <XAxis dataKey="time" stroke="hsl(215, 15%, 55%)" fontSize={11} />
-                    <YAxis stroke="hsl(215, 15%, 55%)" fontSize={11} />
-                    <Tooltip 
-                      contentStyle={{ 
-                        background: 'hsl(220, 18%, 10%)', 
-                        border: '1px solid hsl(220, 13%, 18%)', 
-                        borderRadius: 8, 
-                        fontSize: 12,
-                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.3)'
-                      }} 
-                    />
-                    <Line type="monotone" dataKey={chart.key} stroke={chart.color} strokeWidth={2.5} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
+                <SafeRangeLineChart
+                  data={telemetry}
+                  metricKey={chart.key}
+                  color={chart.color}
+                  height={220}
+                  strokeWidth={2.5}
+                />
               </div>
             ))}
           </div>
