@@ -60,6 +60,9 @@ const toMinuteLabel = (recordedAt?: string): string => {
   });
 };
 
+const VEHICLES_LIST_POLL_MS = 15000;
+const VEHICLE_TELEMETRY_POLL_MS = 5000;
+
 export default function VehiclesPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,44 +71,111 @@ export default function VehiclesPage() {
   const [telemetryLoading, setTelemetryLoading] = useState(false);
 
   useEffect(() => {
-    async function loadVehicles() {
-      setLoading(true);
+    let cancelled = false;
+    let inFlight = false;
+    let intervalId = null;
+
+    async function loadVehicles(showLoader = false) {
+      if (inFlight) return;
+      inFlight = true;
+
+      if (showLoader) {
+        setLoading(true);
+      }
+
       try {
         const data = await fetchVehicles();
-        setVehicles(data);
-        if (data.length > 0) {
-          setSelectedVehicleId(data[0].vehicleId || data[0].id);
+        if (!cancelled) {
+          setVehicles(data);
+
+          setSelectedVehicleId((currentSelectedVehicleId) => {
+            if (currentSelectedVehicleId) {
+              const selectedStillExists = data.some(
+                (vehicle) => (vehicle.vehicleId || vehicle.id) === currentSelectedVehicleId
+              );
+
+              if (selectedStillExists) return currentSelectedVehicleId;
+            }
+
+            return data.length > 0 ? data[0].vehicleId || data[0].id : '';
+          });
         }
       } catch (error) {
         console.error('Error loading vehicles:', error);
       } finally {
-        setLoading(false);
+        if (!cancelled && showLoader) {
+          setLoading(false);
+        }
+
+        inFlight = false;
       }
     }
-    
-    loadVehicles();
+
+    void loadVehicles(true);
+
+    intervalId = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      void loadVehicles(false);
+    }, VEHICLES_LIST_POLL_MS);
+
+    return () => {
+      cancelled = true;
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
   }, []);
 
   useEffect(() => {
-    async function loadVehicleTelemetry() {
-      if (!selectedVehicleId) {
-        setTelemetryHistory([]);
-        return;
+    if (!selectedVehicleId) {
+      setTelemetryHistory([]);
+      return;
+    }
+
+    let cancelled = false;
+    let inFlight = false;
+    let intervalId = null;
+
+    async function loadVehicleTelemetry(showLoader = false) {
+      if (inFlight) return;
+      inFlight = true;
+
+      if (showLoader) {
+        setTelemetryLoading(true);
       }
 
-      setTelemetryLoading(true);
       try {
         const data = await fetchTelemetry(selectedVehicleId, 180);
-        setTelemetryHistory(data);
+        if (!cancelled) {
+          setTelemetryHistory(data);
+        }
       } catch (error) {
         console.error('Error loading selected vehicle telemetry:', error);
-        setTelemetryHistory([]);
+        if (!cancelled && showLoader) {
+          setTelemetryHistory([]);
+        }
       } finally {
-        setTelemetryLoading(false);
+        if (!cancelled && showLoader) {
+          setTelemetryLoading(false);
+        }
+
+        inFlight = false;
       }
     }
 
-    loadVehicleTelemetry();
+    void loadVehicleTelemetry(true);
+
+    intervalId = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      void loadVehicleTelemetry(false);
+    }, VEHICLE_TELEMETRY_POLL_MS);
+
+    return () => {
+      cancelled = true;
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
   }, [selectedVehicleId]);
 
   const selectedVehicle = vehicles.find(

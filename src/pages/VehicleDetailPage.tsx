@@ -76,6 +76,8 @@ const toMinuteLabel = (recordedAt?: string): string => {
   });
 };
 
+const VEHICLE_DETAIL_POLL_MS = 5000;
+
 export default function VehicleDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
@@ -84,28 +86,59 @@ export default function VehicleDetailPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function loadVehicleData() {
-      if (!id) return;
-      
-      setLoading(true);
+    if (!id) {
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    let inFlight = false;
+    let intervalId = null;
+
+    async function loadVehicleData(showLoader = false) {
+      if (!id || inFlight) return;
+      inFlight = true;
+
+      if (showLoader) {
+        setLoading(true);
+      }
+
       try {
         const [vehicleData, alertsData, telemetryData] = await Promise.all([
           fetchVehicle(id),
           fetchAlerts({ vehicleId: id }),
           fetchTelemetry(id, 120),
         ]);
-        
-        setVehicle(vehicleData || null);
-        setVehicleAlerts(alertsData);
-        setTelemetry(telemetryData);
+
+        if (!cancelled) {
+          setVehicle(vehicleData || null);
+          setVehicleAlerts(alertsData);
+          setTelemetry(telemetryData);
+        }
       } catch (error) {
         console.error('Error loading vehicle data:', error);
       } finally {
-        setLoading(false);
+        if (!cancelled && showLoader) {
+          setLoading(false);
+        }
+
+        inFlight = false;
       }
     }
-    
-    loadVehicleData();
+
+    void loadVehicleData(true);
+
+    intervalId = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      void loadVehicleData(false);
+    }, VEHICLE_DETAIL_POLL_MS);
+
+    return () => {
+      cancelled = true;
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
   }, [id]);
 
   if (loading) {

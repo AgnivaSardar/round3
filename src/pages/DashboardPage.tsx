@@ -77,6 +77,8 @@ const itemVariants = {
   show: { opacity: 1, y: 0 },
 };
 
+const DASHBOARD_TELEMETRY_POLL_MS = 5000;
+
 export default function DashboardPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -138,9 +140,17 @@ export default function DashboardPage() {
     }
 
     let cancelled = false;
+    let inFlight = false;
+    let intervalId = null;
 
-    async function loadVehicleTelemetry() {
-      setTelemetryLoading(true);
+    async function loadVehicleTelemetry(showLoader = false) {
+      if (inFlight) return;
+      inFlight = true;
+
+      if (showLoader) {
+        setTelemetryLoading(true);
+      }
+
       try {
         const telemetryData = await fetchTelemetry(selectedVehicleId, 60);
         if (!cancelled) {
@@ -148,20 +158,29 @@ export default function DashboardPage() {
         }
       } catch (error) {
         console.error('Error loading selected vehicle telemetry:', error);
-        if (!cancelled) {
+        if (!cancelled && showLoader) {
           setTelemetry([]);
         }
       } finally {
-        if (!cancelled) {
+        if (!cancelled && showLoader) {
           setTelemetryLoading(false);
         }
+        inFlight = false;
       }
     }
 
-    loadVehicleTelemetry();
+    void loadVehicleTelemetry(true);
+
+    intervalId = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      void loadVehicleTelemetry(false);
+    }, DASHBOARD_TELEMETRY_POLL_MS);
 
     return () => {
       cancelled = true;
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
     };
   }, [selectedVehicleId]);
 
