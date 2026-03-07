@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { DashboardLayout } from '@/components/DashboardLayout';
@@ -7,7 +7,7 @@ import { AlertCard } from '@/components/AlertCard';
 import { SafeRangeLineChart } from '@/components/SafeRangeLineChart';
 import { fetchVehicle, fetchAlerts, fetchTelemetry } from '@/services/api';
 import type { Vehicle, Alert, TelemetryPoint } from '@/services/api';
-import { Car, User, Gauge, MapPin, Download } from 'lucide-react';
+import { Car, User, Gauge, MapPin, Download, X } from 'lucide-react';
 
 const chartConfigs: Array<{
   key: keyof TelemetryPoint;
@@ -95,6 +95,18 @@ const toSafeFileToken = (value: string): string =>
     .replace(/^-+|-+$/g, '');
 
 const VEHICLE_DETAIL_POLL_MS = 5000;
+const VEHICLE_DETAIL_CRITICAL_ALERT_POLL_MS = 3000;
+const VEHICLE_DETAIL_CRITICAL_ALERT_MODAL_MS = 5000;
+
+interface CriticalAlertModalState {
+  id: string;
+  title: string;
+  message: string;
+  vehicleName?: string;
+  timestamp?: string | Date;
+}
+
+const getAlertIdentity = (alert: Alert): string | null => alert.alertId || alert.id || null;
 
 export default function VehicleDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -102,6 +114,44 @@ export default function VehicleDetailPage() {
   const [vehicleAlerts, setVehicleAlerts] = useState<Alert[]>([]);
   const [telemetry, setTelemetry] = useState<TelemetryPoint[]>([]);
   const [loading, setLoading] = useState(true);
+  const [criticalAlertModal, setCriticalAlertModal] = useState<CriticalAlertModalState | null>(null);
+  const alertDismissTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastShownCriticalAlertIdRef = useRef<string | null>(null);
+
+  const showCriticalAlertModalForFiveSeconds = (alert: Alert) => {
+    const alertId = getAlertIdentity(alert);
+    if (!alertId) return;
+
+    setCriticalAlertModal({
+      id: alertId,
+      title: alert.type || 'Critical alert detected',
+      message: alert.message,
+      vehicleName: alert.vehicleName,
+      timestamp: alert.timestamp,
+    });
+
+    if (alertDismissTimeoutRef.current) {
+      clearTimeout(alertDismissTimeoutRef.current);
+    }
+
+    alertDismissTimeoutRef.current = setTimeout(() => {
+      setCriticalAlertModal((current) => (current?.id === alertId ? null : current));
+      alertDismissTimeoutRef.current = null;
+    }, VEHICLE_DETAIL_CRITICAL_ALERT_MODAL_MS);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (alertDismissTimeoutRef.current) {
+        clearTimeout(alertDismissTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    setCriticalAlertModal(null);
+    lastShownCriticalAlertIdRef.current = null;
+  }, [id]);
 
   useEffect(() => {
     if (!id) {
@@ -150,6 +200,59 @@ export default function VehicleDetailPage() {
       if (document.visibilityState !== 'visible') return;
       void loadVehicleData(false);
     }, VEHICLE_DETAIL_POLL_MS);
+
+    return () => {
+      cancelled = true;
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+
+    let cancelled = false;
+    let inFlight = false;
+    let intervalId = null;
+
+    async function pollVehicleCriticalAlerts() {
+      if (inFlight) return;
+      inFlight = true;
+
+      try {
+        const criticalAlerts = await fetchAlerts({
+          vehicleId: id,
+          severity: 'CRITICAL',
+          isResolved: false,
+          limit: 1,
+        });
+
+        if (cancelled) return;
+
+        const latestCriticalAlert = criticalAlerts[0];
+        if (!latestCriticalAlert) return;
+
+        const latestCriticalAlertId = getAlertIdentity(latestCriticalAlert);
+        if (!latestCriticalAlertId) return;
+
+        if (lastShownCriticalAlertIdRef.current !== latestCriticalAlertId) {
+          lastShownCriticalAlertIdRef.current = latestCriticalAlertId;
+          showCriticalAlertModalForFiveSeconds(latestCriticalAlert);
+        }
+      } catch (error) {
+        console.error('Error polling critical alerts for vehicle detail page:', error);
+      } finally {
+        inFlight = false;
+      }
+    }
+
+    void pollVehicleCriticalAlerts();
+
+    intervalId = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      void pollVehicleCriticalAlerts();
+    }, VEHICLE_DETAIL_CRITICAL_ALERT_POLL_MS);
 
     return () => {
       cancelled = true;
@@ -443,6 +546,51 @@ export default function VehicleDetailPage() {
             <p className="text-sm text-muted-foreground py-4 text-center">No historical telemetry data available</p>
           )}
         </div>
+
+        {criticalAlertModal && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/75 px-4 backdrop-blur-sm">
+            <div className="relative w-full max-w-lg rounded-xl border border-destructive/40 bg-card p-5 shadow-2xl">
+              <button
+                type="button"
+                onClick={() => {
+                  setCriticalAlertModal(null);
+                  if (alertDismissTimeoutRef.current) {
+                    clearTimeout(alertDismissTimeoutRef.current);
+                    alertDismissTimeoutRef.current = null;
+                  }
+                }}
+                className="absolute right-3 top-3 rounded-md border border-border/60 p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                aria-label="Close alert modal"
+              >
+                <X className="h-4 w-4" />
+              </button>
+
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-destructive">
+                Critical Alert
+              </p>
+
+              <h3 className="mt-2 text-lg font-heading font-semibold text-foreground">
+                {criticalAlertModal.title || 'Critical fault detected'}
+              </h3>
+
+              <p className="mt-2 text-sm text-muted-foreground">
+                {criticalAlertModal.message || 'A critical vehicle issue was detected.'}
+              </p>
+
+              {criticalAlertModal.vehicleName ? (
+                <p className="mt-3 text-sm text-foreground">
+                  Vehicle: <span className="font-medium">{criticalAlertModal.vehicleName}</span>
+                </p>
+              ) : null}
+
+              <div className="mt-4 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                {criticalAlertModal.timestamp
+                  ? `Detected at ${new Date(criticalAlertModal.timestamp).toLocaleString()} - auto-closing in 5 seconds`
+                  : 'Immediate attention required - auto-closing in 5 seconds'}
+              </div>
+            </div>
+          </div>
+        )}
       </motion.div>
     </DashboardLayout>
   );

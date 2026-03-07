@@ -5,7 +5,7 @@ import { DashboardLayout } from '@/components/DashboardLayout';
 import { HealthScore } from '@/components/HealthScore';
 import { fetchVehicles, fetchTelemetry, fetchAlerts } from '@/services/api';
 import type { Vehicle, TelemetryPoint, Alert } from '@/services/api';
-import { Car, User, Gauge, Download } from 'lucide-react';
+import { Car, User, Gauge, Download, X } from 'lucide-react';
 
 const latestMetricDefinitions: Array<{
   key: keyof TelemetryPoint;
@@ -238,6 +238,43 @@ export default function VehiclesPage() {
       if (intervalId) {
         clearInterval(intervalId);
       }
+    };
+  }, [selectedVehicleId]);
+
+  useEffect(() => {
+    if (!selectedVehicleId) return;
+
+    let cancelled = false;
+
+    async function showCriticalAlertForSelectedVehicle() {
+      try {
+        const vehicleCriticalAlerts = await fetchAlerts({
+          vehicleId: selectedVehicleId,
+          severity: 'CRITICAL',
+          isResolved: false,
+          limit: 1,
+        });
+
+        if (cancelled) return;
+
+        const latestVehicleCriticalAlert = vehicleCriticalAlerts[0];
+        if (!latestVehicleCriticalAlert) return;
+
+        const alertId = getAlertIdentity(latestVehicleCriticalAlert);
+        if (alertId) {
+          seenCriticalAlertIdsRef.current.add(alertId);
+        }
+
+        showCriticalAlertModalForFiveSeconds(latestVehicleCriticalAlert);
+      } catch (error) {
+        console.error('Error loading critical alert for selected vehicle:', error);
+      }
+    }
+
+    void showCriticalAlertForSelectedVehicle();
+
+    return () => {
+      cancelled = true;
     };
   }, [selectedVehicleId]);
 
@@ -582,7 +619,22 @@ export default function VehiclesPage() {
 
         {criticalAlertModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/75 px-4 backdrop-blur-sm">
-            <div className="w-full max-w-lg rounded-xl border border-destructive/40 bg-card p-5 shadow-2xl">
+            <div className="relative w-full max-w-lg rounded-xl border border-destructive/40 bg-card p-5 shadow-2xl">
+              <button
+                type="button"
+                onClick={() => {
+                  setCriticalAlertModal(null);
+                  if (alertDismissTimeoutRef.current) {
+                    clearTimeout(alertDismissTimeoutRef.current);
+                    alertDismissTimeoutRef.current = null;
+                  }
+                }}
+                className="absolute right-3 top-3 rounded-md border border-border/60 p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                aria-label="Close alert modal"
+              >
+                <X className="h-4 w-4" />
+              </button>
+
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-destructive">
                 Critical Alert
               </p>
