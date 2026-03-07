@@ -12,6 +12,11 @@ import VehicleDetailPage from "./pages/VehicleDetailPage";
 import LiveTelemetryPage from "./pages/LiveTelemetryPage";
 import LiveEvaluationPage from "./pages/LiveEvaluationPage";
 import InsightsPage from "./pages/InsightsPage";
+import InsurancePage from "./pages/InsurancePage";
+import DispatchPage from "./pages/DispatchPage";
+import MaintenancePage from "./pages/MaintenancePage";
+import DriversPage from "./pages/DriversPage";
+import SupportPage from "./pages/SupportPage";
 import NotFound from "./pages/NotFound";
 import LandingPage from "./pages/LandingPage";
 
@@ -45,6 +50,11 @@ function AppRoutes() {
           <Route path="/telemetry" element={<PageTransition><LiveTelemetryPage /></PageTransition>} />
           <Route path="/evaluation" element={<PageTransition><LiveEvaluationPage /></PageTransition>} />
           <Route path="/insights" element={<PageTransition><InsightsPage /></PageTransition>} />
+          <Route path="/insurance" element={<PageTransition><InsurancePage /></PageTransition>} />
+          <Route path="/dispatch" element={<PageTransition><DispatchPage /></PageTransition>} />
+          <Route path="/maintenance" element={<PageTransition><MaintenancePage /></PageTransition>} />
+          <Route path="/drivers" element={<PageTransition><DriversPage /></PageTransition>} />
+          <Route path="/support" element={<PageTransition><SupportPage /></PageTransition>} />
           <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
         </Routes>
       </AnimatePresence>

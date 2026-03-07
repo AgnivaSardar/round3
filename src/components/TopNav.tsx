@@ -1,14 +1,30 @@
 import { NavLink as RouterNavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, AlertTriangle, Car, Activity, BarChart3, BrainCircuit, PlusCircle } from 'lucide-react';
+import { 
+  LayoutDashboard, 
+  AlertTriangle, 
+  Car, 
+  Activity, 
+  BarChart3, 
+  BrainCircuit, 
+  Shield,
+  Truck,
+  Wrench,
+  Users,
+  HeadphonesIcon
+} from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/alerts', label: 'Alerts', icon: AlertTriangle },
   { to: '/vehicles', label: 'Vehicles', icon: Car },
-  { to: '/vehicles/new', label: 'Add Vehicle', icon: PlusCircle },
   { to: '/evaluation', label: 'Evaluation', icon: BrainCircuit },
   { to: '/insights', label: 'Insights', icon: BarChart3 },
+  { to: '/insurance', label: 'Insurance', icon: Shield },
+  { to: '/dispatch', label: 'Dispatch', icon: Truck },
+  { to: '/maintenance', label: 'Maintenance', icon: Wrench },
+  { to: '/drivers', label: 'Drivers', icon: Users },
+  { to: '/support', label: 'Support', icon: HeadphonesIcon },
 ];
 
 const isNavItemActive = (pathname: string, itemPath: string): boolean => {

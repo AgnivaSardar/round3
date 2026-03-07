@@ -131,9 +131,18 @@ export default function VehiclesPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-heading font-bold text-foreground">Vehicles</h1>
-          <p className="text-sm text-muted-foreground">{vehicles.length} vehicles in Vehixa fleet</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-heading font-bold text-foreground">Vehicles</h1>
+            <p className="text-sm text-muted-foreground">{vehicles.length} vehicles in Vehixa fleet</p>
+          </div>
+          <Link
+            to="/vehicles/new"
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
+          >
+            <Car className="h-4 w-4" />
+            Add Vehicle
+          </Link>
         </div>
 
         {vehicles.length === 0 ? (
